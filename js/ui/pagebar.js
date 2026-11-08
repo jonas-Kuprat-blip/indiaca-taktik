@@ -6,6 +6,7 @@ import {
   movePage, commit, setHalf, setOrientation, pageOrientation, saveTemplate, pageFromTemplate, renameTemplate, deleteTemplate,
 } from '../store.js';
 import { thumbSVG } from '../render.js';
+import { makeAnimPage, exampleTemplates } from '../anim.js';
 import { menu, modal, promptText, confirmDlg, toast } from './dialogs.js';
 
 let list;
@@ -30,7 +31,7 @@ function renderAll() {
     ...b.pages.map((p) =>
       h('div', { class: 'thumb' + (p.id === state.pageId ? ' active' : ''), 'data-id': p.id },
         h('div', { class: 'thumb-svg', html: thumbSVG(p, b) }),
-        h('div', { class: 'thumb-name' }, p.kind === 'angabe' ? h('span', { class: 'badge' }, 'A') : null, p.half ? h('span', { class: 'badge half' }, '½') : null, p.name)))
+        h('div', { class: 'thumb-name' }, p.kind === 'angabe' ? h('span', { class: 'badge' }, 'A') : null, p.kind === 'anim' ? h('span', { class: 'badge anim' }, '▶') : null, p.half ? h('span', { class: 'badge half' }, '½') : null, p.name)))
   );
   list.querySelector('.thumb.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
@@ -133,7 +134,7 @@ export function newPageDialog() {
             h('div', { class: 'tpl-row' },
               h('button', { class: 'tpl-open', onclick: pick(() => addPage(pageFromTemplate(t))) },
                 h('div', { class: 'tpl-thumb', html: thumbSVG(t.page, { ...board(), fieldType: t.fieldType || board().fieldType }) }),
-                h('div', {}, h('div', { class: 'tpl-name' }, t.name), h('div', { class: 'muted small' }, (FIELDS[t.fieldType]?.short || '') + (t.page.kind === 'angabe' ? ' · Angabe' : '')))),
+                h('div', {}, h('div', { class: 'tpl-name' }, t.name), h('div', { class: 'muted small' }, (FIELDS[t.fieldType]?.short || '') + (t.page.kind === 'angabe' ? ' · Angabe' : t.page.kind === 'anim' ? ` · Animation (${t.page.anim?.steps?.length || 1} Schritte)` : '')))),
               h('button', { class: 'btn', 'aria-label': 'Umbenennen', html: I.edit, onclick: async () => { const v = await promptText('Vorlage umbenennen', t.name); if (v) { await renameTemplate(t.id, v); renderTpl(); } } }),
               h('button', { class: 'btn', 'aria-label': 'Löschen', html: I.trash, onclick: async () => { if (await confirmDlg('Vorlage löschen?', `„${t.name}“ wird gelöscht.`, { okLabel: 'Löschen', danger: true })) { await deleteTemplate(t.id); renderTpl(); } } })))
         : [h('p', { class: 'muted' }, 'Noch keine Vorlagen. Öffne das Menü einer Seite (aktive Seite antippen) → „Als Vorlage speichern“.')])
@@ -151,7 +152,14 @@ export function newPageDialog() {
         opt(I.rotate, 'Querfeld', 'Feld quer, Netz senkrecht', () => addPage(makePage('taktik', false, 'quer'))),
         opt(I.half, 'Eigene Feldhälfte', 'Nur unsere Hälfte, größer', () => addPage(makePage('taktik', true))),
         opt(I.serve, 'Angabe-Seite', 'Ziele mit Kreuzen', () => addPage(makePage('angabe'))),
+        opt(I.anim, 'Animation', 'Spielzug Schritt für Schritt', () => addPage(makeAnimPage())),
         opt(I.copy, 'Kopie dieser Seite', page().name, copyCurrentPage)),
+      h('h3', {}, 'Beispiel-Animationen'),
+      h('div', { class: 'tpl-list' }, exampleTemplates().map((t) =>
+        h('div', { class: 'tpl-row' },
+          h('button', { class: 'tpl-open', onclick: pick(() => addPage(pageFromTemplate(t))) },
+            h('div', { class: 'tpl-thumb', html: thumbSVG(t.page, board()) }),
+            h('div', {}, h('div', { class: 'tpl-name' }, t.name), h('div', { class: 'muted small' }, `Animation · ${t.page.anim.steps.length} Schritte`)))))),
       h('h3', {}, 'Eigene Vorlagen'),
       tplBox),
   });

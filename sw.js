@@ -1,6 +1,6 @@
 // Service Worker: macht die App komplett offline-fähig.
 // Bei jeder Änderung an Dateien VERSION hochzählen, damit alte Caches gelöscht werden.
-const VERSION = 'taktik-v12';
+const VERSION = 'taktik-v13';
 const ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const ASSETS = [
   './js/stroke.js',
   './js/render.js',
   './js/stage.js',
+  './js/anim.js',
   './js/icons.js',
   './js/ui/dialogs.js',
   './js/ui/toolbar.js',
@@ -29,7 +30,8 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // cache: 'reload' umgeht den HTTP-Cache, damit wirklich die neue Version gespeichert wird
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -48,7 +50,7 @@ self.addEventListener('fetch', (e) => {
     caches.open(VERSION).then(async (cache) => {
       const key = req.mode === 'navigate' ? './index.html' : req;
       const cached = await cache.match(key, { ignoreSearch: true });
-      const network = fetch(req)
+      const network = fetch(req.mode === 'navigate' ? req : new Request(req, { cache: 'no-cache' }))
         .then((res) => {
           if (res.ok) cache.put(key, res.clone());
           return res;

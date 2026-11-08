@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { newBoard, newPage, FIELDS, TEAM_DEFAULT, migrateElement } from './model.js';
+import { newBoard, newPage, FIELDS, TEAM_DEFAULT, migrateElement, ensureAnim } from './model.js';
 import { uid, clone, debounce } from './util.js';
 
 export const state = {
@@ -61,18 +61,26 @@ const H = (id) => {
 export function snapshot() {
   const p = page();
   const h = H(p.id);
-  h.u.push(JSON.stringify(p.elements));
+  h.u.push(snap(p));
   if (h.u.length > 150) h.u.shift();
   h.r.length = 0;
 }
 export const canUndo = () => H(page().id).u.length > 0;
 export const canRedo = () => H(page().id).r.length > 0;
+// Undo-Stand: Elemente + (bei Animationen) die Schritte
+const snap = (p) => JSON.stringify({ e: p.elements, a: p.anim });
 function restore(from, to) {
   const p = page();
   const h = H(p.id);
   if (!h[from].length) return;
-  h[to].push(JSON.stringify(p.elements));
-  p.elements = JSON.parse(h[from].pop());
+  h[to].push(snap(p));
+  const d = JSON.parse(h[from].pop());
+  if (Array.isArray(d)) p.elements = d;
+  else {
+    p.elements = d.e;
+    if (d.a) p.anim = d.a;
+  }
+  emit('anim');
   if (state.selectionId && !findEl(state.selectionId)) state.selectionId = null;
   touch();
   emit('elements');
@@ -176,7 +184,7 @@ function normalizeBoard(b) {
 }
 function normalizePage(p) {
   p.id ||= uid();
-  p.kind = p.kind === 'angabe' ? 'angabe' : 'taktik';
+  p.kind = ['angabe', 'anim'].includes(p.kind) ? p.kind : 'taktik';
   p.name ||= 'Seite';
   p.notes ||= '';
   if (!Array.isArray(p.elements)) p.elements = [];
@@ -184,6 +192,7 @@ function normalizePage(p) {
     e.id ||= uid();
     migrateElement(e);
   });
+  if (p.kind === 'anim') ensureAnim(p);
   return p;
 }
 

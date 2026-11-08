@@ -52,6 +52,25 @@ export function clampPlayer(el, fieldType) {
   return el;
 }
 
+/**
+ * Animationsseite: Spieler sind „Actors“ mit fester ID, jeder Schritt speichert nur deren Positionen.
+ * page.anim = { actors: {id: {team, color, size, label, number}}, steps: [{id, note, dur, pos: {id: [x, y]}}], cur }
+ * Ein Actor ohne Position in einem Schritt ist dort ausgeblendet.
+ */
+export function ensureAnim(p) {
+  const a = (p.anim ||= {});
+  if (!a.actors || typeof a.actors !== 'object') a.actors = {};
+  if (!Array.isArray(a.steps) || !a.steps.length) a.steps = [{ id: uid(), note: '', dur: 1, pos: {} }];
+  a.steps.forEach((s) => {
+    s.id ||= uid();
+    s.note ||= '';
+    s.dur = +s.dur > 0 ? +s.dur : 1;
+    if (!s.pos || typeof s.pos !== 'object') s.pos = {};
+  });
+  a.cur = Math.min(Math.max(0, a.cur | 0), a.steps.length - 1);
+  return p;
+}
+
 export function newBoard(name = 'Neues Board', fieldType = 'indiaca') {
   const now = Date.now();
   return {

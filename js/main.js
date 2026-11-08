@@ -5,6 +5,7 @@ import { initPalette } from './ui/palette.js';
 import { initPagebar } from './ui/pagebar.js';
 import { initNotes } from './ui/notes.js';
 import { initSelectionBar } from './ui/selection.js';
+import { initAnim } from './anim.js';
 
 // iOS: Pinch-Zoom & Doppeltipp-Zoom der Seite unterbinden
 document.addEventListener('gesturestart', (e) => e.preventDefault());
@@ -15,6 +16,7 @@ async function start() {
   const wrap = document.getElementById('stage-wrap');
   initStage(wrap);
   initSelectionBar(wrap);
+  initAnim(wrap);
   initToolbar(document.getElementById('toolbar'));
   initPalette(document.getElementById('palette'));
   initNotes(document.getElementById('notes'));

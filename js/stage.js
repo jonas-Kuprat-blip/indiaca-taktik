@@ -17,6 +17,7 @@ import { I } from './icons.js';
  * auch gezoomt/gedreht exakt an der richtigen Stelle, und alles bewegt sich gemeinsam mit dem Feld.
  */
 
+let gGhost;
 let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar, rotpanel, rotInput, rotLabel, rotBtn;
 let drawnKey = '';
 const gestures = new Map(); // pointerId → Geste
@@ -90,7 +91,7 @@ export function initStage(wrap) {
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   svg.innerHTML =
     '<defs><clipPath id="vclip"><rect id="vclip-r"/></clipPath></defs>' +
-    '<g id="g-cam"><g id="g-world" clip-path="url(#vclip)"><g id="g-field"></g><g id="g-els"></g><g id="g-live"></g><g id="g-sel"></g></g></g>';
+    '<g id="g-cam"><g id="g-world" clip-path="url(#vclip)"><g id="g-field"></g><g id="g-ghost"></g><g id="g-els"></g><g id="g-live"></g><g id="g-sel"></g></g></g>';
   trash = document.createElement('div');
   trash.id = 'trash';
   trash.setAttribute('aria-label', 'Zum Löschen hierher ziehen');
@@ -144,7 +145,7 @@ export function initStage(wrap) {
   logo.alt = 'Indiaca im CVJM Kamen e.V.';
   logo.draggable = false;
   wrap.append(svg, trash, zoombar, rotpanel, logo);
-  [gCam, gWorld, gField, gEls, gLive, gSel] = ['#g-cam', '#g-world', '#g-field', '#g-els', '#g-live', '#g-sel'].map((s) => svg.querySelector(s));
+  [gCam, gWorld, gField, gEls, gLive, gSel, gGhost] = ['#g-cam', '#g-world', '#g-field', '#g-els', '#g-live', '#g-sel', '#g-ghost'].map((s) => svg.querySelector(s));
 
   // Mac: Trackpad-Pinch/Mausrad = Zoom (Drehen nur über den Regler)
   svg.addEventListener('wheel', (e) => {
@@ -188,12 +189,32 @@ function drawField() {
   cr.setAttribute('width', mb.x1 - mb.x0);
   cr.setAttribute('height', mb.y1 - mb.y0);
 }
+// ---------- Hooks für Animationen ----------
+let frameOverride = null; // () => Seite mit interpolierten Spielern (während der Wiedergabe)
+let ghostRenderer = null; // (rot) => SVG-Markup für Geister/Laufwege
+let editLock = () => false; // true → keine Bearbeitung (Wiedergabe läuft)
+export function setFrameOverride(fn) {
+  frameOverride = fn;
+  drawEls();
+}
+export function setGhostRenderer(fn) {
+  ghostRenderer = fn;
+}
+export function setEditLock(fn) {
+  editLock = fn;
+}
+export function redraw() {
+  drawEls();
+}
+
 function drawEls() {
-  gEls.innerHTML = renderElements(page(), board(), rot());
+  const pg = frameOverride ? frameOverride() : page();
+  gEls.innerHTML = renderElements(pg, board(), rot());
+  gGhost.innerHTML = ghostRenderer ? ghostRenderer(rot()) : '';
   drawSel();
 }
 function drawSel() {
-  const el = state.selectionId && findEl(state.selectionId);
+  const el = !frameOverride && state.selectionId && findEl(state.selectionId);
   gSel.innerHTML = el ? renderSelection(el, page(), board()) : '';
 }
 
@@ -275,9 +296,10 @@ function down(e) {
   }
 
   const pt = toW(inv(), e.clientX, e.clientY);
-  const handleNode = e.target.closest?.('[data-handle]');
-  const elNode = e.target.closest?.('#g-els [data-id]');
-  let tool = palmMode ? 'select' : state.tool;
+  const locked = editLock();
+  const handleNode = locked ? null : e.target.closest?.('[data-handle]');
+  const elNode = locked ? null : e.target.closest?.('#g-els [data-id]');
+  let tool = palmMode || locked ? 'select' : state.tool;
   // Einmal-Werkzeuge: Tippen auf ein vorhandenes Element verschiebt es, statt etwas Neues zu setzen
   if (elNode && ONE_SHOT.includes(tool)) {
     tool = 'select';

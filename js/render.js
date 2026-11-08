@@ -18,33 +18,11 @@ export function viewBox(ft, half = false, rot = 0) {
 export const worldTransform = (rot) => (rot ? 'rotate(-90)' : '');
 
 // ---------- Feld ----------
-/** Parkett-Muster in Metern (dreht/zoomt mit dem Feld). Dielen 0,2 m breit, 1,2 m lang, versetzt. */
-function parquetPattern() {
-  const PL = 1.2, PW = 0.2, ROWS = 4, TW = PL * 2;
-  const offs = [0, 0.6, 0.3, 0.9];
-  let planks = '';
-  for (let r = 0; r < ROWS; r++) {
-    const y = r * PW;
-    for (let k = -1; k <= 2; k++) {
-      const x = offs[r] + k * PL;
-      const tone = (((k % 2) + 2) % 2 + r) % 3;
-      planks += `<rect class="pk${tone}" x="${f(x)}" y="${f(y)}" width="${PL}" height="${PW}"/>` +
-        `<line class="pk-grain" x1="${f(x + 0.08)}" y1="${f(y + PW * 0.38)}" x2="${f(x + PL * 0.55)}" y2="${f(y + PW * 0.42)}"/>` +
-        `<line class="pk-grain" x1="${f(x + PL * 0.4)}" y1="${f(y + PW * 0.7)}" x2="${f(x + PL - 0.1)}" y2="${f(y + PW * 0.66)}"/>` +
-        `<line class="pk-seam" x1="${f(x)}" y1="${f(y)}" x2="${f(x)}" y2="${f(y + PW)}"/>`;
-    }
-    planks += `<line class="pk-seam" x1="0" y1="${f(y)}" x2="${TW}" y2="${f(y)}"/>`;
-  }
-  return `<defs><pattern id="parkett" patternUnits="userSpaceOnUse" width="${TW}" height="${f(PW * ROWS)}">${planks}</pattern></defs>`;
-}
-
 export function renderField(b) {
   const F = FIELDS[b.fieldType];
   const L = F.length, W = F.width, a = F.attack, m = F.margin;
   const x0 = -L / 2 - m, y0 = -W / 2 - m;
-  return `${parquetPattern()}
-  <rect fill="url(#parkett)" x="${x0}" y="${y0}" width="${L + 2 * m}" height="${W + 2 * m}"/>
-  <rect class="f-out" x="${x0}" y="${y0}" width="${L + 2 * m}" height="${W + 2 * m}"/>
+  return `<rect class="f-out" x="${x0}" y="${y0}" width="${L + 2 * m}" height="${W + 2 * m}"/>
   <rect class="f-court" x="${-L / 2}" y="${-W / 2}" width="${L}" height="${W}"/>
   <line class="f-line f-att" x1="${-a}" y1="${-W / 2}" x2="${-a}" y2="${W / 2}"/>
   <line class="f-line f-att" x1="${a}" y1="${-W / 2}" x2="${a}" y2="${W / 2}"/>
@@ -95,14 +73,22 @@ export function symbolMarkup(symbol, color, s) {
   return `<path d="${d}" class="mk-halo" style="stroke-width:${f(0.2 * s)}"/><path d="${d}" style="stroke:${c};stroke-width:${f(0.11 * s)};stroke-linecap:round"/>`;
 }
 
+/** Spieler-Symbol: Kopf + Oberkörper, zentriert um (0,0) */
+export function playerIcon(color, s = 1) {
+  const c = colorCss(color);
+  const k = (n) => f(n * s);
+  return `<path class="pl-b" d="M${k(-0.33)} ${k(0.37)}C${k(-0.33)} ${k(0.07)} ${k(-0.2)} ${k(-0.01)} 0 ${k(-0.01)}C${k(0.2)} ${k(-0.01)} ${k(0.33)} ${k(0.07)} ${k(0.33)} ${k(0.37)}Z" style="fill:${c}"/>` +
+    `<circle class="pl-b" cy="${k(-0.21)}" r="${k(0.15)}" style="fill:${c}"/>`;
+}
+
 export function renderOne(el, page, b, rot = 0) {
   const s = FIELDS[b.fieldType].s;
   switch (el.type) {
     case 'player': {
-      const R = 0.4 * s;
+      const R = 0.55 * s;
       return `<g class="el pl" data-id="${el.id}" transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}">
-        <circle r="${R}" class="pl-c" style="fill:${colorCss(el.color)}"/>
-        ${el.label ? `<text class="lbl" y="${f(R + 0.32 * s)}" font-size="${f(0.32 * s)}" text-anchor="middle" dominant-baseline="central">${esc(el.label)}</text>` : ''}
+        <circle r="${R}" class="pl-hit"/>${playerIcon(el.color, s * 1.35)}
+        ${el.label ? `<text class="lbl" y="${f(R + 0.28 * s)}" font-size="${f(0.32 * s)}" text-anchor="middle" dominant-baseline="central">${esc(el.label)}</text>` : ''}
       </g>`;
     }
     case 'zone': {
@@ -153,7 +139,7 @@ export function renderSelection(el, page, b) {
   const pad = 0.12 * s;
   switch (el.type) {
     case 'player':
-      return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.4 * s + pad)}"/>`;
+      return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.55 * s + pad)}"/>`;
     case 'marker':
       return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.36 * s)}"/>` + (el.from ? handle('from', el.from.x, el.from.y, s) : '');
     case 'arrow':

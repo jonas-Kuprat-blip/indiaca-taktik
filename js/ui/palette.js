@@ -1,20 +1,15 @@
-import { h, colorCss } from '../util.js';
+import { h } from '../util.js';
+import { playerIcon } from '../render.js';
 import { I } from '../icons.js';
-import { state, on, set, setTool, board, setTeam } from '../store.js';
+import { state, on, set, setTool, board } from '../store.js';
 import { dropPlayer, addPlayerDefault } from '../stage.js';
-import { colorPicker } from './dialogs.js';
 
 export function initPalette(root) {
   // --- Spieler ---
   const teamCols = ['own', 'opp'].map((team) => {
-    const head = h('button', { class: 'team-head', title: 'Teamfarbe ändern', 'aria-label': 'Teamfarbe ändern' });
-    head.onclick = () => colorPicker(head, board().teams[team].color, (c) => setTeam(team, { color: c }), { allowInk: false });
-    const tokens = [1, 2, 3, 4, 5].map((n) => {
-      const t = h('div', { class: 'token', role: 'button', 'aria-label': `Spieler ${n} (${team === 'own' ? 'eigenes Team' : 'Gegner'})` });
-      bindTokenDrag(t, team, n);
-      return t;
-    });
-    return { team, head, tokens, col: h('div', { class: 'team-col' }, head, tokens) };
+    const t = h('div', { class: 'token', role: 'button', title: team === 'own' ? 'Eigener Spieler (blau)' : 'Gegner (rot)', 'aria-label': team === 'own' ? 'Eigener Spieler' : 'Gegnerischer Spieler' });
+    bindTokenDrag(t, team);
+    return { team, token: t, col: t };
   });
 
   // --- Werkzeuge ---
@@ -40,11 +35,7 @@ export function initPalette(root) {
   const update = () => {
     const b = board();
     if (!b) return;
-    for (const c of teamCols) {
-      const t = b.teams[c.team];
-      c.head.innerHTML = `<span class="dot" style="background:${colorCss(t.color)}"></span>`;
-      c.tokens.forEach((tk) => (tk.style.background = colorCss(t.color)));
-    }
+    for (const c of teamCols) c.token.innerHTML = `<svg viewBox="-0.5 -0.5 1 1" aria-hidden="true">${playerIcon(b.teams[c.team].color, 1.15)}</svg>`;
     zoneBtns.forEach((x) => x.classList.toggle('active', state.tool === x.dataset.tool));
     markerBtns.forEach((x) => x.classList.toggle('active', state.tool === 'marker' && state.markerSymbol === x.dataset.symbol));
   };
@@ -52,7 +43,7 @@ export function initPalette(root) {
 }
 
 /** Token aus der Palette ziehen (oder antippen = Grundposition) */
-function bindTokenDrag(tokenEl, team, number) {
+function bindTokenDrag(tokenEl, team) {
   let start = null, ghost = null;
   tokenEl.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -76,8 +67,8 @@ function bindTokenDrag(tokenEl, team, number) {
     if (ghost) {
       ghost.remove();
       ghost = null;
-      if (ok) dropPlayer(team, number, e.clientX, e.clientY);
-    } else if (ok) addPlayerDefault(team, number);
+      if (ok) dropPlayer(team, null, e.clientX, e.clientY);
+    } else if (ok) addPlayerDefault(team);
     start = null;
   };
   tokenEl.addEventListener('pointerup', (e) => end(e, true));

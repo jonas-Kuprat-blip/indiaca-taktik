@@ -40,6 +40,18 @@ export function migrateElement(e) {
   return e;
 }
 
+/** Spieler nur auf der eigenen Feldseite: eigenes Team x < 0, Gegner x > 0 (Modellkoordinaten) */
+export function clampPlayer(el, fieldType) {
+  const F = FIELDS[fieldType];
+  const gap = 0.3 * F.s; // Abstand zum Netz
+  const maxX = F.length / 2 + F.margin - 0.35 * F.s;
+  const maxY = F.width / 2 + F.margin - 0.35 * F.s;
+  const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  el.x = Math.round((el.team === 'opp' ? cl(el.x, gap, maxX) : cl(el.x, -maxX, -gap)) * 1000) / 1000;
+  el.y = Math.round(cl(el.y, -maxY, maxY) * 1000) / 1000;
+  return el;
+}
+
 export function newBoard(name = 'Neues Board', fieldType = 'indiaca') {
   const now = Date.now();
   return {

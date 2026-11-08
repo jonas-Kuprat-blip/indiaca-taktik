@@ -1,7 +1,7 @@
 import { h, colorCss, clone, uid } from '../util.js';
 import { I } from '../icons.js';
-import { COLORS } from '../model.js';
-import { state, on, findEl, page, commit, snapshot, changed, select, scale } from '../store.js';
+import { COLORS, clampPlayer } from '../model.js';
+import { state, on, findEl, page, board, commit, snapshot, changed, select, scale } from '../store.js';
 import { colorPicker } from './dialogs.js';
 
 /** Schwebende Leiste über dem Feld für das ausgewählte Element */
@@ -40,7 +40,8 @@ export function initSelectionBar(wrap) {
         const c = clone(el);
         c.id = uid();
         const d = 0.6 * scale();
-        if ('x' in c) { c.x += d; c.y += d; }
+        if (c.type === 'player') { c.y += d; clampPlayer(c, board().fieldType); }
+        else if ('x' in c) { c.x += d; c.y += d; }
         if (c.points) c.points = c.points.map((q) => [q[0] + d, q[1] + d]);
         if ('x1' in c) { c.x1 += d; c.x2 += d; c.y1 += d; c.y2 += d; }
         if (c.from) c.from = { x: c.from.x + d, y: c.from.y + d };

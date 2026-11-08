@@ -2,7 +2,7 @@ import { NS, uid, clone, dist, segDist, r3, colorCss } from './util.js';
 import {
   state, board, page, findEl, commit, snapshot, changed, select, on, emit, switchPage, pageIndex, scale, activeServeType, setTool, pageOrientation,
 } from './store.js';
-import { defaultPos } from './model.js';
+import { defaultPos, clampPlayer } from './model.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox } from './render.js';
 import { strokePath } from './stroke.js';
 import { I } from './icons.js';
@@ -185,7 +185,7 @@ function overTrash(cx, cy) {
 // ---------- Spieler hinzufügen ----------
 function playerEl(team, number, pt) {
   const t = board().teams[team];
-  return { id: uid(), type: 'player', team, number: String(number), label: '', color: t.color, x: r3(pt.x), y: r3(pt.y) };
+  return clampPlayer({ id: uid(), type: 'player', team, number: number == null ? '' : String(number), label: '', color: t.color, x: pt.x, y: pt.y }, board().fieldType);
 }
 export function dropPlayer(team, number, cx, cy) {
   if (!isOverStage(cx, cy)) return false;
@@ -194,6 +194,8 @@ export function dropPlayer(team, number, cx, cy) {
   return true;
 }
 export function addPlayerDefault(team, number) {
+  // nächste freie Grundposition 1–5 für dieses Team
+  if (number == null) number = (page().elements.filter((e) => e.type === 'player' && e.team === team).length % 5) + 1;
   const pt = defaultPos(board().fieldType, team, number);
   const taken = (q) => page().elements.some((e) => e.type === 'player' && dist(e, q) < 0.4);
   for (let i = 0; i < 6 && taken(pt); i++) pt.y += 0.9 * (pt.y > 0 ? -1 : 1);
@@ -489,6 +491,10 @@ function addPoint(g, p, pr) {
 function translate(el, o, dx, dy) {
   switch (el.type) {
     case 'player':
+      el.x = o.x + dx;
+      el.y = o.y + dy;
+      clampPlayer(el, board().fieldType);
+      break;
     case 'marker':
       el.x = r3(o.x + dx);
       el.y = r3(o.y + dy);

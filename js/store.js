@@ -175,6 +175,7 @@ export async function init() {
 function normalizeBoard(b) {
   b.fieldType = FIELDS[b.fieldType] ? b.fieldType : 'indiaca';
   b.teams ||= clone(TEAM_DEFAULT);
+  if (!b.stats || typeof b.stats !== 'object') b.stats = {};
   b.name ||= 'Board';
   b.createdAt ||= Date.now();
   b.updatedAt ||= Date.now();

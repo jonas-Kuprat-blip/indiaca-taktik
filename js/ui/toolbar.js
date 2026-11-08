@@ -4,6 +4,7 @@ import { COLORS, WIDTHS } from '../model.js';
 import { state, on, set, setTool, undo, redo, canUndo, canRedo, board, page, renameBoard, pageOrientation, setOrientation } from '../store.js';
 import { promptText, colorPicker } from './dialogs.js';
 import { openBoardManager } from './boards.js';
+import { openStats } from './stats.js';
 
 const TOOLS = [
   ['select', I.select, 'Auswählen / Verschieben'],
@@ -56,6 +57,7 @@ export function initToolbar(root) {
   const undoBtn = btn(I.undo, 'Rückgängig', undo);
   const redoBtn = btn(I.redo, 'Wiederholen', redo);
   const notesBtn = btn(I.notes, 'Notizen', () => set({ notesOpen: !state.notesOpen }));
+  const statsBtn = btn(I.stats, 'Statistik (Fehlangabe, Abwehr, Angriff)', openStats);
   const rotBtn = btn(I.rotate, 'Feld kippen (hoch/quer)', () => setOrientation(pageOrientation() === 'quer' ? 'hoch' : 'quer'));
   const themeBtn = btn(I.theme, 'Theme', () => set({ theme: THEMES[(THEMES.indexOf(state.theme) + 1) % 3] }));
 
@@ -66,7 +68,7 @@ export function initToolbar(root) {
     h('div', { class: 'group colors' }, colorBtns, customBtn), h('div', { class: 'sep' }),
     widthGroup,
     h('div', { class: 'spacer' }),
-    palmBtn, undoBtn, redoBtn, rotBtn, notesBtn, themeBtn
+    palmBtn, undoBtn, redoBtn, rotBtn, notesBtn, statsBtn, themeBtn
   );
 
   const update = () => {

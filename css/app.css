@@ -3,7 +3,7 @@
   --bg: #eef1f5; --panel: #ffffff; --panel2: #f1f4f8; --text: #0f172a; --muted: #64748b; --border: #d9dee6;
   --accent: #2563eb; --accent-text: #ffffff; --danger: #dc2626;
   --ink: #111827; --halo: #ffffff;
-  --out: #1d4f86; --court: #8fc3ea; --line: #ffffff; --net: #10243f; --table: #ecdfc9;
+  --out: #17396a; --court: #e8d3b0; --line: #ffffff; --line-edge: rgba(95, 65, 25, .35); --net: #10243f; --table: #17396a;
   --shadow: 0 8px 30px rgba(15, 23, 42, .18);
   color-scheme: light;
 }
@@ -12,7 +12,7 @@
     --bg: #0b1220; --panel: #111a2b; --panel2: #1a2438; --text: #e5e9f0; --muted: #8b97ab; --border: #26324a;
     --accent: #3b82f6; --danger: #f87171;
     --ink: #111827; --halo: #ffffff;
-    --out: #1d4f86; --court: #8fc3ea; --line: #ffffff; --net: #10243f; --table: #ecdfc9;
+    --out: #17396a; --court: #e8d3b0; --line: #ffffff; --line-edge: rgba(95, 65, 25, .35); --net: #10243f; --table: #17396a;
     --shadow: 0 8px 30px rgba(0, 0, 0, .5);
     color-scheme: dark;
   }
@@ -21,7 +21,7 @@
   --bg: #0b1220; --panel: #111a2b; --panel2: #1a2438; --text: #e5e9f0; --muted: #8b97ab; --border: #26324a;
   --accent: #3b82f6; --danger: #f87171;
   --ink: #111827; --halo: #ffffff;
-  --out: #1d4f86; --court: #8fc3ea; --line: #ffffff; --net: #10243f; --table: #ecdfc9;
+  --out: #17396a; --court: #e8d3b0; --line: #ffffff; --line-edge: rgba(95, 65, 25, .35); --net: #10243f; --table: #17396a;
   --shadow: 0 8px 30px rgba(0, 0, 0, .5);
   color-scheme: dark;
 }
@@ -116,7 +116,8 @@ button { font: inherit; color: inherit; }
 svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
 .f-out { fill: var(--out); }
 .f-court { fill: var(--court); }
-.f-line { stroke: var(--line); stroke-width: .09; fill: none; }
+.f-line { stroke: var(--line); stroke-width: .1; fill: none; }
+.f-edge { stroke: var(--line-edge); stroke-width: .14; fill: none; }
 .f-att { stroke-width: .08; }
 .f-net { stroke: var(--net); stroke-width: .13; stroke-linecap: round; }
 .f-post { fill: var(--net); }

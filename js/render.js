@@ -24,9 +24,10 @@ export function renderField(b) {
   const x0 = -L / 2 - m, y0 = -W / 2 - m;
   return `<rect class="f-out" x="${x0}" y="${y0}" width="${L + 2 * m}" height="${W + 2 * m}"/>
   <rect class="f-court" x="${-L / 2}" y="${-W / 2}" width="${L}" height="${W}"/>
-  <line class="f-line f-att" x1="${-a}" y1="${-W / 2}" x2="${-a}" y2="${W / 2}"/>
-  <line class="f-line f-att" x1="${a}" y1="${-W / 2}" x2="${a}" y2="${W / 2}"/>
-  <rect class="f-line" x="${-L / 2}" y="${-W / 2}" width="${L}" height="${W}"/>
+  ${['f-edge', 'f-line'].map((c) => `
+  <line class="${c}" x1="${-a}" y1="${-W / 2}" x2="${-a}" y2="${W / 2}"/>
+  <line class="${c}" x1="${a}" y1="${-W / 2}" x2="${a}" y2="${W / 2}"/>
+  <rect class="${c}" x="${-L / 2}" y="${-W / 2}" width="${L}" height="${W}"/>`).join('')}
   <line class="f-net" x1="0" y1="${-W / 2 - 0.45}" x2="0" y2="${W / 2 + 0.45}"/>
   <circle class="f-post" cx="0" cy="${-W / 2 - 0.45}" r="0.1"/>
   <circle class="f-post" cx="0" cy="${W / 2 + 0.45}" r="0.1"/>`;

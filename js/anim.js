@@ -351,10 +351,11 @@ function updateNote() {
 // ---------- Beispielvorlagen ----------
 function example(name, steps) {
   const b = board();
-  const mk = (id, [x, y]) =>
-    id === 'ball'
-      ? { id, type: 'marker', symbol: 'indiaca', color: '#dc2626', label: '', size: 1, x, y }
-      : { id, type: 'player', team: id[0] === 'o' ? 'opp' : 'own', color: b.teams[id[0] === 'o' ? 'opp' : 'own'].color, size: 1, label: '', number: '', x, y };
+  const mk = (id, [x, y]) => {
+    if (id === 'ball') return { id, type: 'marker', symbol: 'indiaca', color: '#dc2626', label: '', size: 1, x, y };
+    const team = id[0] === 'o' ? 'opp' : 'own';
+    return { id, type: 'player', team, color: b.teams[team].color, size: 1, label: '', number: '', role: id.endsWith('z') ? 'zuspiel' : 'angriff', x, y };
+  };
   const pg = {
     id: uid(), kind: 'anim', name, notes: '', elements: [],
     anim: { cur: 0, steps: steps.map((s) => ({ id: uid(), dur: 1, note: s.note, ...(s.dur ? { dur: s.dur } : {}), els: Object.fromEntries(Object.entries(s.pos).map(([id, xy]) => [id, mk(id, xy)])) })) },
@@ -362,23 +363,44 @@ function example(name, steps) {
   load(pg, 0);
   return { id: 'ex-' + name, name, builtin: true, fieldType: b.fieldType, page: pg };
 }
-const OPP = { o1: [5.5, -2], o2: [6, 0], o3: [5.5, 2], o4: [2, -1.4], o5: [2, 1.4] };
+
+/*
+ * Indiaca-Grundaufstellung: 3 vorne, 2 hinten.
+ * Koordinaten in Metern, eigene Hälfte x < 0 (Netz bei x = 0, 3-m-Linie bei x = −3),
+ * y < 0 = links, y > 0 = rechts (aus Sicht des eigenen Teams; im Hochformat ist die eigene Hälfte unten).
+ *   aa = Außenangreifer (links, 3-m-Linie)   am = Mittelangreifer (Mitte/leicht rechts, 3-m-Linie)
+ *   az = Zuspieler (rechts vorne am Netz)    ahl/ahr = Abwehr hinten links/rechts
+ * Gegner gespiegelt (o…): aus seiner Sicht dieselbe Aufstellung.
+ */
+const OWN = { aa: [-3, -2], am: [-3, 0.5], az: [-0.8, 2.2], ahl: [-6, -1.5], ahr: [-6, 1.5] };
+const OPP = { oa: [3, 2], om: [3, -0.5], oz: [0.8, -2.2], ohl: [6, 1.5], ohr: [6, -1.5] };
+const withOpp = (own, opp = {}) => ({ ...OPP, ...opp, ...own });
+
 export function exampleTemplates() {
   return [
     example('K1: Annahme → Aufbau → Angriff', [
-      { note: 'Annahme: drei hinten, Steller vorne', pos: { a1: [-6, -2], a2: [-6.4, 0], a3: [-6, 2], a4: [-3.2, -1.3], a5: [-1.5, 1.8], ...OPP, ball: [-5.9, 0.2] } },
-      { note: 'Pass zum Steller, Angreifer läuft an', dur: 1.2, pos: { a1: [-5.6, -2.2], a2: [-5.2, 0.2], a3: [-5.6, 2.2], a4: [-2.6, -2], a5: [-0.9, 0.4], ...OPP, ball: [-0.6, 0.6] } },
-      { note: 'Angriff über links, Rest sichert ab', pos: { a1: [-4.2, -2], a2: [-4.6, 0.2], a3: [-4.2, 2], a4: [-0.7, -1.8], a5: [-1.6, 0.6], ...OPP, ball: [-0.3, -1.8] } },
-      { note: 'Schlag ins gegnerische Feld', dur: 0.6, pos: { a1: [-4.2, -2], a2: [-4.6, 0.2], a3: [-4.2, 2], a4: [-0.7, -1.8], a5: [-1.6, 0.6], ...OPP, ball: [4.2, 1.6] } },
+      { note: 'Grundaufstellung: 3 vorne, 2 hinten – Gegner schlägt auf', pos: withOpp({ ...OWN, ball: [8.6, -1.5] }, { ohr: [8.4, -1.5] }) },
+      { note: 'Annahme hinten links', dur: 1.4, pos: withOpp({ ...OWN, ahl: [-5.7, -1.2], ball: [-5.5, -1.1] }, { ohr: [6, -1.5] }) },
+      { note: 'Pass zum Zuspieler, Außen holt Anlauf', pos: withOpp({ ...OWN, ahl: [-5.4, -1.2], aa: [-3.8, -2.4], am: [-2.6, 0.3], az: [-0.9, 1.8], ball: [-0.6, 1.7] }) },
+      { note: 'Angriff über außen, Rest sichert ab', pos: withOpp({ ...OWN, aa: [-0.7, -2.1], am: [-2.2, -0.4], az: [-1.3, 1.4], ahl: [-4.4, -1.4], ahr: [-4.6, 1.2], ball: [-0.4, -2.1] }) },
+      { note: 'Punkt im gegnerischen Feld', dur: 0.6, pos: withOpp({ ...OWN, aa: [-0.7, -2.1], am: [-2.2, -0.4], az: [-1.3, 1.4], ahl: [-4.4, -1.4], ahr: [-4.6, 1.2], ball: [4.6, 1.8] }) },
     ]),
     example('K2: Grundstellung → Block/Abwehr', [
-      { note: 'Grundstellung', pos: { a1: [-5.5, -2], a2: [-6.2, 0], a3: [-5.5, 2], a4: [-1.4, -1.4], a5: [-1.4, 1.4], o1: [5.5, -2], o2: [6, 0], o3: [5.5, 2], o4: [1.8, -1.5], o5: [1.2, 1.2] } },
-      { note: 'Gegner stellt nach außen, Block orientiert sich', pos: { a1: [-5.2, -2.2], a2: [-6, -0.2], a3: [-5, 1.8], a4: [-0.9, -1.6], a5: [-1, 0.2], o1: [5.2, -2], o2: [5.8, 0], o3: [5.2, 2], o4: [1, -2], o5: [0.8, 0] } },
-      { note: 'Doppelblock links, Abwehr dahinter', pos: { a1: [-4.6, -2.4], a2: [-5.6, -0.4], a3: [-3.8, 1.2], a4: [-0.4, -2.2], a5: [-0.4, -1.2], o1: [5.2, -2], o2: [5.8, 0], o3: [5.2, 2], o4: [0.6, -2], o5: [0.8, 0] } },
+      { note: 'Grundstellung: 3 vorne, 2 hinten – Gegner im Aufbau', pos: withOpp({ ...OWN, ball: [0.9, -1.9] }) },
+      { note: 'Gegner stellt nach außen – Block verschiebt nach rechts', pos: withOpp(
+        { aa: [-3.3, -1.6], am: [-1.2, 1.2], az: [-0.6, 2.2], ahl: [-5.6, -1.2], ahr: [-5.4, 2.2], ball: [0.7, 1.9] },
+        { oa: [1.6, 2.2], oz: [0.8, -1.8] }) },
+      { note: 'Doppelblock (Zuspieler + Mitte), Außen und hinten sichern ab', pos: withOpp(
+        { aa: [-3.6, -1.2], am: [-0.4, 1.2], az: [-0.4, 2.1], ahl: [-5.2, -0.6], ahr: [-4.6, 2.5], ball: [-0.2, 1.6] },
+        { oa: [0.5, 2.0], oz: [0.8, -1.8] }) },
+      { note: 'Abwehr hinten links – Gegenangriff kann starten', pos: withOpp(
+        { aa: [-3.6, -1.6], am: [-1.4, 0.8], az: [-0.8, 1.8], ahl: [-5, -0.4], ahr: [-4.6, 2.2], ball: [-4.9, -0.4] },
+        { oa: [1.2, 2.0], oz: [0.8, -1.8] }) },
     ]),
     example('Angabe → Annahme', [
-      { note: 'Gegner schlägt auf', pos: { a1: [-6, -2], a2: [-6.4, 0], a3: [-6, 2], a4: [-2.5, -1.5], a5: [-2.5, 1.5], o1: [7.6, 1.5], o2: [5, 0], o3: [4.5, 2], o4: [1.6, -1.4], o5: [1.6, 1.4], ball: [8.1, 1.5] } },
-      { note: 'Annahme rechts hinten, Steller löst sich', dur: 1.4, pos: { a1: [-5.4, -1.6], a2: [-6.2, 0.6], a3: [-6.8, 2.3], a4: [-2.8, -1.8], a5: [-1, 0.8], o1: [6, 1.5], o2: [5, 0], o3: [4.5, 2], o4: [1.6, -1.4], o5: [1.6, 1.4], ball: [-6.6, 2.0] } },
+      { note: 'Gegner schlägt auf – Grundaufstellung 3 vorne, 2 hinten', pos: withOpp({ ...OWN, ball: [8.6, -1.5] }, { ohr: [8.4, -1.5] }) },
+      { note: 'Annahme hinten rechts, Zuspieler bleibt am Netz', dur: 1.4, pos: withOpp({ ...OWN, ahr: [-6.3, 1.8], am: [-3.2, 0.2], ball: [-6.1, 1.8] }, { ohr: [6, -1.5] }) },
+      { note: 'Pass zum Zuspieler', pos: withOpp({ ...OWN, ahr: [-5.8, 1.6], aa: [-3.6, -2.3], am: [-2.8, 0.2], az: [-0.9, 1.9], ball: [-0.6, 1.8] }) },
     ]),
   ];
 }

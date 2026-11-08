@@ -4,33 +4,41 @@ import { board, page, touch, emit } from '../store.js';
 import { modal, confirmDlg } from './dialogs.js';
 
 /*
- * Statistik pro Board.
+ * Statistik pro Board (Rollen: Angreifer / Zuspieler).
  *  board.stats     = { "own:jonas": { fehl, block, abwehr, angriff, blockout, team, name, color } }
  *  board.statsTeam = { geschenke }   // Punkte durch Fehler des Gegners – unabhängig von Spielern
  *
  * Schulnote (1,0 … 6,0), live berechnet. Angelehnt an die übliche Volleyball-Effizienz
- * (Punkte − Fehler) / Versuche:
- *   Wert   = 1·Angriff + 1·Block + 1·Blockout + 0,5·Abwehr − 1·Fehlangabe
+ * (Punkte − Fehler) / Versuche, mit Gewichten je nach Rolle:
+ *   Wert   = Σ Gewicht · Anzahl
  *   Effiz. = Wert / (Aktionen + 2)      → −1 … +1; „+2“ dämpft Ausreißer bei wenigen Aktionen
  *   Note   = 3,5 − 2,5 · Effizienz      → +1 = 1,0 · 0 = 3,5 · −1 = 6,0
- * Geschenke fließen nicht in die Noten ein.
+ * Zuspieler werden über perfekte Zuspiele bewertet (zählen wie ein Punkt), Abwehr zählt bei ihnen stärker.
+ * Team-Note = Durchschnitt der Spielernoten. Geschenke fließen nicht in die Noten ein.
  */
 const COLS = [
-  ['fehl', 'Fehlangabe', -1],
-  ['block', 'Block', 1],
-  ['abwehr', 'Abwehr', 0.5],
-  ['angriff', 'Angriff', 1],
-  ['blockout', 'Blockout', 1],
+  ['fehl', 'Fehlangabe'],
+  ['block', 'Block'],
+  ['abwehr', 'Abwehr'],
+  ['angriff', 'Angriff'],
+  ['zuspiel', 'Perf. Zuspiel'],
+  ['blockout', 'Blockout'],
 ];
+const WEIGHTS = {
+  angriff: { fehl: -1, block: 1, abwehr: 0.5, angriff: 1, zuspiel: 0.5, blockout: 1 },
+  zuspiel: { fehl: -1, block: 1, abwehr: 0.75, angriff: 1, zuspiel: 1, blockout: 1 },
+};
+const ROLE_LABEL = { angriff: 'Angreifer', zuspiel: 'Zuspieler' };
 const PRIOR = 2;
 const keyOf = (team, name) => `${team}:${name.trim().toLowerCase()}`;
 const stats = () => (board().stats ||= {});
 const team = () => (board().statsTeam ||= { geschenke: 0 });
 
-export function grade(v) {
+export function grade(v, role = v.role || 'angriff') {
+  const w = WEIGHTS[role] || WEIGHTS.angriff;
   const n = COLS.reduce((a, [c]) => a + (v[c] || 0), 0);
   if (!n) return null;
-  const val = COLS.reduce((a, [c, , w]) => a + w * (v[c] || 0), 0);
+  const val = COLS.reduce((a, [c]) => a + w[c] * (v[c] || 0), 0);
   const eff = val / (n + PRIOR);
   return Math.min(6, Math.max(1, 3.5 - 2.5 * eff));
 }
@@ -46,11 +54,11 @@ function rows() {
     const k = keyOf(e.team, e.label);
     if (seen.has(k)) continue;
     seen.add(k);
-    list.push({ key: k, team: e.team, name: e.label.trim(), color: e.color, onField: true });
+    list.push({ key: k, team: e.team, name: e.label.trim(), color: e.color, role: e.role || 'angriff', onField: true });
   }
   for (const [k, v] of Object.entries(st)) {
     if (seen.has(k) || !COLS.some(([c]) => v[c] > 0)) continue;
-    list.push({ key: k, team: v.team, name: v.name, color: v.color, onField: false });
+    list.push({ key: k, team: v.team, name: v.name, color: v.color, role: v.role || 'angriff', onField: false });
   }
   return list.sort((a, b) => (a.team === b.team ? a.name.localeCompare(b.name, 'de') : a.team === 'own' ? -1 : 1));
 }
@@ -76,22 +84,35 @@ export function openStats() {
     const list = rows();
     const head = h('div', { class: 'st-row st-head' }, h('div', { class: 'st-name' }, 'Spieler'), COLS.map(([, label]) => h('div', { class: 'st-col' }, label)), h('div', { class: 'st-col' }, 'Note'));
     const totals = Object.fromEntries(COLS.map(([c]) => [c, 0]));
+    const grades = [];
     const lines = list.map((r) => {
       const v = (st[r.key] ||= {});
-      Object.assign(v, { team: r.team, name: r.name, color: r.color });
+      Object.assign(v, { team: r.team, name: r.name, color: r.color, role: r.role });
       COLS.forEach(([c]) => (totals[c] += v[c] || 0));
+      const g = grade(v, r.role);
+      if (g != null) grades.push(g);
+      // Rolle per Tippen umschalten (auch die Spieler auf dem Feld)
+      const roleBtn = h('button', { class: 'role-chip ' + r.role, title: 'Rolle umschalten', onclick: () => changed(() => {
+        const nr = r.role === 'zuspiel' ? 'angriff' : 'zuspiel';
+        v.role = nr;
+        let hit = false;
+        for (const e of page().elements) if (e.type === 'player' && e.team === r.team && keyOf(e.team, e.label || '') === r.key) { e.role = nr; hit = true; }
+        if (hit) emit('elements');
+      }) }, r.role === 'zuspiel' ? 'Z' : 'A');
       return h('div', { class: 'st-row' + (r.onField ? '' : ' off') },
-        h('div', { class: 'st-name' }, h('span', { class: 'dot', style: { background: colorCss(r.color) } }), h('span', { class: 'nm' }, r.name),
+        h('div', { class: 'st-name' }, h('span', { class: 'dot', style: { background: colorCss(r.color) } }), roleBtn,
+          h('span', { class: 'nm', title: ROLE_LABEL[r.role] }, r.name),
           r.onField ? null : h('span', { class: 'muted small' }, ' (nicht auf Seite)')),
         COLS.map(([c, label]) => counter(v[c], (d) => changed(() => (v[c] = Math.max(0, (v[c] || 0) + d))), `${r.name} ${label}`)),
-        gradeCell(grade(v)));
+        gradeCell(g));
     });
     const empty = list.length
       ? []
       : [h('p', { class: 'muted', style: { padding: '10px 6px 0' } }, 'Noch keine benannten Spieler – die Liste ist leer.'),
          h('p', { class: 'muted small' }, 'So geht’s: Spieler auf dem Feld antippen → oben in der Leiste einen Namen eingeben.')];
     const sum = h('div', { class: 'st-row st-sum' }, h('div', { class: 'st-name' }, 'Gesamt'),
-      COLS.map(([c]) => h('div', { class: 'st-col' }, String(totals[c]))), gradeCell(grade(totals)));
+      COLS.map(([c]) => h('div', { class: 'st-col' }, String(totals[c]))),
+      gradeCell(grades.length ? grades.reduce((a, b) => a + b, 0) / grades.length : null));
 
     // Geschenke: Punkte durch Fehler des Gegners (Team, ohne Spieler, nicht in der Note)
     const t = team();
@@ -103,7 +124,9 @@ export function openStats() {
         h('span', { class: 'muted small' }, `(${own} eigene + ${t.geschenke || 0} geschenkt)`)));
     const info = h('details', { class: 'st-info' },
       h('summary', {}, 'Wie wird die Note berechnet?'),
-      h('p', { class: 'small' }, 'Angriff, Block und Blockout zählen je +1, Abwehr +0,5, Fehlangabe −1. Die Summe wird durch die Zahl der Aktionen (+2 zum Ausgleich bei wenigen Aktionen) geteilt und auf 1,0 (sehr gut) bis 6,0 umgerechnet. Geschenke zählen nicht zur Note.'));
+      h('p', { class: 'small' }, 'Angreifer (A): Angriff, Block, Blockout je +1 · Abwehr +0,5 · perfektes Zuspiel +0,5 · Fehlangabe −1.'),
+      h('p', { class: 'small' }, 'Zuspieler (Z): perfektes Zuspiel +1 · Angriff, Block, Blockout je +1 · Abwehr +0,75 · Fehlangabe −1.'),
+      h('p', { class: 'small' }, 'Die Summe wird durch die Zahl der Aktionen (+2 als Ausgleich bei wenigen Aktionen) geteilt und auf 1,0 (sehr gut) bis 6,0 umgerechnet. Die Team-Note ist der Durchschnitt der Spielernoten. Geschenke zählen nicht zur Note. Rolle ändern: Spieler auf dem Feld antippen → Angreifer/Zuspieler, oder hier auf A/Z tippen.'));
     body.replaceChildren(h('div', { class: 'st-table' }, head, ...lines, ...empty, sum), gifts, info);
   };
   render();

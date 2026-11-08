@@ -37,6 +37,9 @@ export function capture(p = page()) {
     // Spielername gilt für alle Schritte: geänderten Namen überall übernehmen
     if (e.type === 'player' && (old[e.id]?.label || '') !== (e.label || ''))
       for (const other of p.anim.steps) if (other.els[e.id]) other.els[e.id].label = e.label || '';
+    // Rolle (Angreifer/Zuspieler) gilt ebenfalls für alle Schritte
+    if (e.type === 'player' && old[e.id] && (old[e.id].role || 'angriff') !== (e.role || 'angriff'))
+      for (const other of p.anim.steps) if (other.els[e.id]) other.els[e.id].role = e.role;
   }
 }
 /** Fehlende Spielernamen aus anderen Schritten ergänzen (z. B. in Schritt 1 benannt, Schritt 3 noch ohne Namen) */

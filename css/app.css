@@ -128,6 +128,11 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 #g-field, #g-live, .st, .legend, .legend * { pointer-events: none; }
 .pl-b { stroke: #ffffff; stroke-width: .05; paint-order: stroke; stroke-linejoin: round; }
 .pl-hit { fill: transparent; }
+.pl-role { fill: #facc15; stroke: #111827; stroke-width: .025; }
+.pl-role-t { fill: #111827; font-weight: 900; pointer-events: none; }
+.seg { display: flex; flex: none; background: var(--panel2); border-radius: 12px; padding: 3px; gap: 2px; }
+.seg-btn { border: 0; background: transparent; border-radius: 9px; padding: 0 12px; height: 38px; font-weight: 700; font-size: 14px; color: var(--muted); touch-action: manipulation; cursor: pointer; }
+.seg-btn.active { background: var(--accent); color: #fff; }
 .pl-n { fill: #fff; font-weight: 700; pointer-events: none; }
 .lbl { fill: #0f172a; stroke: var(--halo); stroke-width: .09; paint-order: stroke; font-weight: 600; pointer-events: none; }
 .lg-t { fill: var(--text); font-weight: 600; }
@@ -321,10 +326,12 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 .serve-edit .row { display: flex; gap: 8px; align-items: center; }
 
 /* ---------- Statistik ---------- */
-.modal.stats-modal { width: min(1040px, 100%); }
+.modal.stats-modal { width: min(1120px, 100%); }
+.role-chip { flex: none; width: 28px; height: 28px; border-radius: 8px; border: 0; font-weight: 900; font-size: 13px; cursor: pointer; touch-action: manipulation; background: var(--panel); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+.role-chip.zuspiel { background: #facc15; color: #111827; box-shadow: none; }
 .stats { display: flex; flex-direction: column; gap: 12px; }
 .st-table { display: flex; flex-direction: column; gap: 4px; overflow-x: auto; }
-.st-row { display: grid; grid-template-columns: minmax(96px, 1.2fr) repeat(5, minmax(118px, 1fr)) 64px; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 12px; background: var(--panel2); min-width: 760px; }
+.st-row { display: grid; grid-template-columns: minmax(120px, 1.2fr) repeat(6, minmax(112px, 1fr)) 60px; align-items: center; gap: 3px; padding: 4px 6px; border-radius: 12px; background: var(--panel2); min-width: 880px; }
 .st-row.off { opacity: .75; }
 .st-head { background: transparent; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .st-sum { background: transparent; font-weight: 800; border-top: 2px solid var(--border); border-radius: 0; }
@@ -332,7 +339,7 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 .st-name .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-col { text-align: center; }
 .st-counter { display: flex; align-items: center; justify-content: center; gap: 3px; }
-.st-btn { width: 42px; height: 44px; min-width: 42px; padding: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+.st-btn { width: 40px; height: 44px; min-width: 40px; padding: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
 .st-btn.plus { background: var(--accent); border-color: var(--accent); color: #fff; }
 .st-num { min-width: 28px; font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .grade { display: inline-block; min-width: 46px; padding: 6px 4px; border-radius: 10px; font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }

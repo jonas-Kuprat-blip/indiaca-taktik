@@ -96,7 +96,13 @@ export function initSelectionBar(wrap) {
     if (el.type === 'player') {
       // Drehung in 15°-Schritten, gespeichert im Bereich −180…180°
       const turnP = (d) => commit(() => { const z = findEl(el.id); z.rot = ((((z.rot || 0) + d + 180) % 360) + 360) % 360 - 180; });
-      parts.push(lbl('Größe'), slider(el, 'size', '0.5', '2', '0.1', 'Größe', 1),
+      const setRole = (r) => commit(() => (findEl(el.id).role = r));
+      const isSetter = el.role === 'zuspiel';
+      parts.push(
+        h('div', { class: 'seg' },
+          h('button', { class: 'seg-btn' + (!isSetter ? ' active' : ''), onclick: () => setRole('angriff') }, 'Angreifer'),
+          h('button', { class: 'seg-btn' + (isSetter ? ' active' : ''), onclick: () => setRole('zuspiel') }, 'Zuspieler')),
+        lbl('Größe'), slider(el, 'size', '0.5', '2', '0.1', 'Größe', 1),
         lbl('Drehen'),
         h('button', { class: 'btn', html: I.turnL, 'aria-label': 'Spieler links drehen', title: 'Links drehen', onclick: () => turnP(-15) }),
         h('button', { class: 'btn', html: I.turnR, 'aria-label': 'Spieler rechts drehen', title: 'Rechts drehen', onclick: () => turnP(15) }),

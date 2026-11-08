@@ -12,6 +12,8 @@ export const I = {
   notes: svg('<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h7M9 17h5"/>'),
   theme: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
+  minus: svg('<path d="M5 12h14"/>'),
+  fit: svg('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
   rect: svg('<rect x="3.5" y="6" width="17" height="12" rx="1.5"/>'),
   circle: svg('<circle cx="12" cy="12" r="8.5"/>'),
   free: svg('<path d="M6 7.5C8.5 3.5 18 3 19.5 8s-2.5 9.5-7 10.5S3 18 3.5 14 4.8 9.5 6 7.5z"/>'),

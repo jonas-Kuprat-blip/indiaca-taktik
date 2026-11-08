@@ -1,6 +1,6 @@
-import { NS, uid, clone, dist, segDist, r3, colorCss } from './util.js';
+import { NS, uid, clone, dist, segDist, r3, colorCss, clamp } from './util.js';
 import {
-  state, board, page, findEl, commit, snapshot, changed, select, on, emit, switchPage, pageIndex, scale, activeServeType,
+  state, board, page, findEl, commit, snapshot, changed, select, on, emit, switchPage, pageIndex, scale, activeServeType, setTool,
 } from './store.js';
 import { defaultPos } from './model.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox } from './render.js';
@@ -15,6 +15,44 @@ function overTrash(cx, cy) {
 
 let svg, gWorld, gField, gEls, gLive, gSel, trash;
 let drawnKey = '';
+let zoombar;
+// ---------- Zoom (Ansicht) ----------
+const view = { k: 1, cx: null, cy: null, base: [0, 0, 1, 1] };
+const ZMAX = 5;
+function applyView() {
+  const [x, y, w, h] = view.base;
+  const w2 = w / view.k, h2 = h / view.k;
+  view.cx = clamp(view.cx ?? x + w / 2, x + w2 / 2, x + w - w2 / 2);
+  view.cy = clamp(view.cy ?? y + h / 2, y + h2 / 2, y + h - h2 / 2);
+  svg.setAttribute('viewBox', `${view.cx - w2 / 2} ${view.cy - h2 / 2} ${w2} ${h2}`);
+  zoombar?.classList.toggle('zoomed', view.k > 1.01);
+}
+function screenToView(cx, cy) {
+  const p = new DOMPoint(cx, cy).matrixTransform(svg.getScreenCTM().inverse());
+  return { x: p.x, y: p.y };
+}
+/** Ansichtspunkt p0 (View-Koordinaten) unter den Bildschirmpunkt (sx, sy) legen */
+function pinTo(p0, sx, sy) {
+  applyView();
+  const pm = screenToView(sx, sy);
+  view.cx += p0.x - pm.x;
+  view.cy += p0.y - pm.y;
+  applyView();
+}
+function zoomAt(sx, sy, factor) {
+  const p0 = screenToView(sx, sy);
+  view.k = clamp(view.k * factor, 1, ZMAX);
+  pinTo(p0, sx, sy);
+}
+function zoomCenter(factor) {
+  const r = svg.getBoundingClientRect();
+  zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor);
+}
+function resetView() {
+  view.k = 1;
+  view.cx = view.cy = null;
+  applyView();
+}
 const rot = () => (state.orientation === 'quer' ? 0 : 90);
 const gestures = new Map(); // pointerId → Geste
 
@@ -27,7 +65,28 @@ export function initStage(wrap) {
   trash.id = 'trash';
   trash.setAttribute('aria-label', 'Zum Löschen hierher ziehen');
   trash.innerHTML = I.trash;
-  wrap.append(svg, trash);
+  zoombar = document.createElement('div');
+  zoombar.id = 'zoombar';
+  const zb = (label, html, fn) => {
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.setAttribute('aria-label', label);
+    b.title = label;
+    b.innerHTML = html;
+    b.onclick = fn;
+    return b;
+  };
+  zoombar.append(
+    zb('Vergrößern', I.plus, () => zoomCenter(1.4)),
+    zb('Verkleinern', I.minus, () => zoomCenter(1 / 1.4)),
+    zb('Ganzes Feld zeigen', I.fit, resetView)
+  );
+  wrap.append(svg, trash, zoombar);
+  // Trackpad-Pinch / Mausrad (Mac)
+  svg.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)));
+  }, { passive: false });
   [gWorld, gField, gEls, gLive, gSel] = ['#g-world', '#g-field', '#g-els', '#g-live', '#g-sel'].map((s) => svg.querySelector(s));
 
   svg.addEventListener('pointerdown', down);
@@ -49,11 +108,18 @@ export function initStage(wrap) {
   });
 }
 
-const key = () => `${board().fieldType}|${!!page().half}|${rot()}`;
+const key = () => `${board().fieldType}|${!!page().half}|${rot()}|${page().id}`;
 function drawField() {
   const b = board();
-  drawnKey = key();
-  svg.setAttribute('viewBox', viewBox(b.fieldType, page().half, rot()));
+  const k = key();
+  view.base = viewBox(b.fieldType, page().half, rot()).split(' ').map(Number);
+  if (k !== drawnKey) {
+    // Neue Seite / anderes Feld → Zoom zurücksetzen
+    view.k = 1;
+    view.cx = view.cy = null;
+  }
+  drawnKey = k;
+  applyView();
   gWorld.setAttribute('transform', worldTransform(rot()));
   gField.innerHTML = renderField(b, rot());
   // Alles außerhalb des Sichtbereichs (z. B. gegnerische Hälfte) abschneiden
@@ -134,6 +200,11 @@ function down(e) {
       const g = { kind: 'swipe', ptype: 'touch', ids: [oid, e.pointerId], start: {}, pos: {} };
       g.start[oid] = g.pos[oid] = { x: og.cx0, y: og.cy0 };
       g.start[e.pointerId] = g.pos[e.pointerId] = { x: e.clientX, y: e.clientY };
+      const a = g.start[oid], c = g.start[e.pointerId];
+      g.d0 = Math.hypot(a.x - c.x, a.y - c.y) || 1;
+      g.k0 = view.k;
+      g.c0 = { cx: view.cx, cy: view.cy };
+      g.p0 = screenToView((a.x + c.x) / 2, (a.y + c.y) / 2);
       gestures.set(oid, g);
       gestures.set(e.pointerId, g);
       capture(e);
@@ -144,7 +215,12 @@ function down(e) {
   const pt = toW(inv(), e.clientX, e.clientY);
   const handleNode = e.target.closest?.('[data-handle]');
   const elNode = e.target.closest?.('#g-els [data-id]');
-  const tool = palmMode ? 'select' : state.tool;
+  let tool = palmMode ? 'select' : state.tool;
+  // Zielmarker/Zonen/Pfeil: Tippen auf ein vorhandenes Element verschiebt es statt etwas Neues zu setzen
+  if (elNode && ['marker', 'arrow', 'rect', 'circle', 'free'].includes(tool)) {
+    tool = 'select';
+    setTool('select');
+  }
   capture(e);
   const g = { ptype: e.pointerType, t0: performance.now(), cx0: e.clientX, cy0: e.clientY, start: pt, moved: false };
   gestures.set(e.pointerId, g);
@@ -193,6 +269,9 @@ function move(e) {
   if (!g) return;
   if (g.kind === 'swipe') {
     g.pos[e.pointerId] = { x: e.clientX, y: e.clientY };
+    const [a, c] = g.ids.map((i) => g.pos[i]);
+    view.k = clamp(g.k0 * (Math.hypot(a.x - c.x, a.y - c.y) / g.d0), 1, ZMAX);
+    pinTo(g.p0, (a.x + c.x) / 2, (a.y + c.y) / 2);
     return;
   }
   const m = inv();
@@ -280,12 +359,13 @@ function up(e) {
             x1: r3(g.start.x), y1: r3(g.start.y), x2: r3(g.end.x), y2: r3(g.end.y),
           })
         );
+      setTool('select');
       break;
     case 'zone': {
       const z = zoneFrom(g);
       if (z) {
         commit((pg) => pg.elements.push(z));
-        state.tool === 'select' || select(null);
+        setTool('select');
       }
       break;
     }
@@ -299,6 +379,7 @@ function up(e) {
       if (st) mk.serveType = st.id;
       if (withArrow) mk.from = { x: r3(g.start.x), y: r3(g.start.y) };
       if (p) commit((pg) => pg.elements.push(mk));
+      setTool('select');
       break;
     }
   }
@@ -332,9 +413,14 @@ function endSwipe(g) {
     dx += (g.pos[id].x - g.start[id].x) / 2;
     dy += (g.pos[id].y - g.start[id].y) / 2;
   }
-  if (Math.abs(dx) > 90 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
+  const zoomChanged = Math.abs(view.k / g.k0 - 1) > 0.1;
+  if (g.k0 <= 1.01 && !zoomChanged && Math.abs(dx) > 90 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
     const pages = board().pages;
     const i = pageIndex() + (dx < 0 ? 1 : -1);
+    view.k = g.k0;
+    view.cx = g.c0.cx;
+    view.cy = g.c0.cy;
+    applyView();
     if (i >= 0 && i < pages.length) switchPage(pages[i].id);
   }
 }

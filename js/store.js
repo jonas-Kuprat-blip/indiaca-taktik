@@ -8,7 +8,7 @@ export const state = {
   boardId: null,
   pageId: null,
   // Werkzeuge
-  tool: 'pen', // select | pen | arrow | eraser | rect | circle | free | marker
+  tool: 'select', // select | pen | arrow | eraser | rect | circle | free | marker
   color: 'ink',
   width: 0.1,
   arrowDashed: false,
@@ -113,7 +113,7 @@ export function touch(b = board()) {
 }
 export const flushNow = () => flush();
 
-const PREF_KEYS = ['tool', 'color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme', 'orientation'];
+const PREF_KEYS = ['color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme', 'orientation'];
 const savePrefs = debounce(() => {
   const p = {};
   PREF_KEYS.forEach((k) => (p[k] = state[k]));
@@ -249,7 +249,6 @@ export function switchPage(id) {
   if (id === state.pageId) return;
   state.pageId = id;
   state.selectionId = null;
-  if (page().kind === 'angabe' && !['select', 'marker', 'eraser'].includes(state.tool)) state.tool = 'marker';
   rememberLast();
   emitPage();
 }
@@ -265,7 +264,6 @@ export function addPage(p) {
   const b = board();
   b.pages.splice(pageIndex() + 1, 0, p);
   touch();
-  if (p.kind === 'angabe') state.tool = 'marker';
   state.pageId = null; // erzwingt Wechsel
   switchPage(p.id);
 }

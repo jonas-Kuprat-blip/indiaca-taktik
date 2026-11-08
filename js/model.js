@@ -5,8 +5,8 @@ import { uid, clone } from './util.js';
  * s = Größenfaktor für Tokens/Marker, damit sie auf dem größeren Volleyballfeld gleich groß wirken.
  */
 export const FIELDS = {
-  indiaca: { label: 'Indiaca (16 × 6,10 m)', short: 'Indiaca', length: 16, width: 6.1, attack: 3, margin: 1.6, s: 1 },
-  volleyball: { label: 'Volleyball (18 × 9 m)', short: 'Volleyball', length: 18, width: 9, attack: 3, margin: 2, s: 1.15 },
+  indiaca: { label: 'Indiaca (16 × 6,10 m)', short: 'Indiaca', length: 16, width: 6.1, attack: 3, margin: 0.9, s: 1 },
+  volleyball: { label: 'Volleyball (18 × 9 m)', short: 'Volleyball', length: 18, width: 9, attack: 3, margin: 1.1, s: 1.15 },
 };
 
 export const COLORS = ['ink', '#ffffff', '#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7'];

@@ -22,7 +22,7 @@ export function renderField(b, rot = 0) {
   const F = FIELDS[b.fieldType];
   const L = F.length, W = F.width, a = F.attack, m = F.margin, s = F.s;
   const x0 = -L / 2 - m, y0 = -W / 2 - m;
-  const ly = -W / 2 - m * 0.42;
+  const ly = -W / 2 - m * 0.45;
   return `
   <rect class="f-out" x="${x0}" y="${y0}" width="${L + 2 * m}" height="${W + 2 * m}"/>
   <rect class="f-court" x="${-L / 2}" y="${-W / 2}" width="${L}" height="${W}"/>

@@ -3,19 +3,32 @@ import {
   state, board, page, findEl, commit, snapshot, changed, select, on, emit, switchPage, pageIndex, scale, activeServeType,
 } from './store.js';
 import { defaultPos } from './model.js';
-import { renderField, renderElements, renderSelection, renderOne, viewBox } from './render.js';
+import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox } from './render.js';
 import { strokePath } from './stroke.js';
+import { I } from './icons.js';
 
-let svg, gField, gEls, gLive, gSel;
+function overTrash(cx, cy) {
+  const r = trash.getBoundingClientRect();
+  const pad = 12;
+  return cx >= r.left - pad && cx <= r.right + pad && cy >= r.top - pad && cy <= r.bottom + pad;
+}
+
+let svg, gWorld, gField, gEls, gLive, gSel, trash;
+let drawnKey = '';
+const rot = () => (state.orientation === 'quer' ? 0 : 90);
 const gestures = new Map(); // pointerId → Geste
 
 export function initStage(wrap) {
   svg = document.createElementNS(NS, 'svg');
   svg.id = 'stage';
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-  svg.innerHTML = '<g id="g-field"></g><g id="g-els"></g><g id="g-live"></g><g id="g-sel"></g>';
-  wrap.append(svg);
-  [gField, gEls, gLive, gSel] = ['#g-field', '#g-els', '#g-live', '#g-sel'].map((s) => svg.querySelector(s));
+  svg.innerHTML = '<defs><clipPath id="vclip"><rect id="vclip-r"/></clipPath></defs><g id="g-world" clip-path="url(#vclip)"><g id="g-field"></g><g id="g-els"></g><g id="g-live"></g><g id="g-sel"></g></g>';
+  trash = document.createElement('div');
+  trash.id = 'trash';
+  trash.setAttribute('aria-label', 'Zum Löschen hierher ziehen');
+  trash.innerHTML = I.trash;
+  wrap.append(svg, trash);
+  [gWorld, gField, gEls, gLive, gSel] = ['#g-world', '#g-field', '#g-els', '#g-live', '#g-sel'].map((s) => svg.querySelector(s));
 
   svg.addEventListener('pointerdown', down);
   svg.addEventListener('pointermove', move);
@@ -26,18 +39,33 @@ export function initStage(wrap) {
   wrap.addEventListener('touchstart', (e) => e.target.closest('#stage') && e.preventDefault(), { passive: false });
   wrap.addEventListener('touchmove', (e) => e.target.closest('#stage') && e.preventDefault(), { passive: false });
 
-  on('board', drawField);
+  on(['board', 'page'], drawField);
   on('elements', drawEls);
-  on('ui', drawSel);
+  on('ui', () => {
+    if (drawnKey !== key()) {
+      drawField();
+      drawEls();
+    } else drawSel();
+  });
 }
 
+const key = () => `${board().fieldType}|${!!page().half}|${rot()}`;
 function drawField() {
   const b = board();
-  svg.setAttribute('viewBox', viewBox(b.fieldType));
-  gField.innerHTML = renderField(b);
+  drawnKey = key();
+  svg.setAttribute('viewBox', viewBox(b.fieldType, page().half, rot()));
+  gWorld.setAttribute('transform', worldTransform(rot()));
+  gField.innerHTML = renderField(b, rot());
+  // Alles außerhalb des Sichtbereichs (z. B. gegnerische Hälfte) abschneiden
+  const mb = modelBox(b.fieldType, page().half);
+  const cr = svg.querySelector('#vclip-r');
+  cr.setAttribute('x', mb.x0);
+  cr.setAttribute('y', mb.y0);
+  cr.setAttribute('width', mb.x1 - mb.x0);
+  cr.setAttribute('height', mb.y1 - mb.y0);
 }
 function drawEls() {
-  gEls.innerHTML = renderElements(page(), board());
+  gEls.innerHTML = renderElements(page(), board(), rot());
   drawSel();
 }
 function drawSel() {
@@ -47,7 +75,7 @@ function drawSel() {
 
 // ---------- Koordinaten ----------
 function inv() {
-  return svg.getScreenCTM().inverse();
+  return gWorld.getScreenCTM().inverse();
 }
 function toW(m, cx, cy) {
   const p = new DOMPoint(cx, cy).matrixTransform(m);
@@ -179,6 +207,8 @@ function move(e) {
       const el = findEl(g.id);
       if (!el) return;
       translate(el, g.orig, pt.x - g.start.x, pt.y - g.start.y);
+      trash.classList.add('show');
+      trash.classList.toggle('hot', overTrash(e.clientX, e.clientY));
       changed();
       break;
     }
@@ -218,9 +248,18 @@ function up(e) {
   if (g.kind === 'swipe') return endSwipe(g);
   const s = scale();
   const p = page();
+  const pg0 = p;
   switch (g.kind) {
     case 'move':
+      trash.classList.remove('show', 'hot');
       if (!g.moved) select(g.id);
+      else if (overTrash(e.clientX, e.clientY)) {
+        // Snapshot wurde beim Drag-Start angelegt → ein Undo stellt das Element wieder her
+        pg0.elements = pg0.elements.filter((x) => x.id !== g.id);
+        if (state.selectionId === g.id) state.selectionId = null;
+        changed();
+        emit('ui');
+      }
       break;
     case 'none':
       if (state.selectionId) select(null);
@@ -275,6 +314,7 @@ function cancel(e) {
 
 function abort(id, g) {
   gestures.delete(id);
+  trash.classList.remove('show', 'hot');
   if (g.kind === 'move' && g.moved) {
     const el = findEl(g.id);
     if (el) {
@@ -403,15 +443,15 @@ function live(g) {
   let out = '';
   if (g.kind === 'stroke') out = `<path d="${strokePath(g.points, g.width, g.pressure)}" style="fill:${colorCss(g.color)}"/>`;
   else if (g.kind === 'arrow' && dist(g.start, g.end) > 0.05)
-    out = renderOne({ id: 'live', type: 'arrow', x1: g.start.x, y1: g.start.y, x2: g.end.x, y2: g.end.y, color: state.color, width: state.width * s, dashed: state.arrowDashed }, p, b);
+    out = renderOne({ id: 'live', type: 'arrow', x1: g.start.x, y1: g.start.y, x2: g.end.x, y2: g.end.y, color: state.color, width: state.width * s, dashed: state.arrowDashed }, p, b, rot());
   else if (g.kind === 'zone') {
     const z = g.shape === 'free' ? { ...zoneFrom({ ...g, points: [...g.points, [g.end.x, g.end.y]] }) } : zoneFrom(g);
-    if (z && z.type) out = renderOne({ ...z, id: 'live' }, p, b);
+    if (z && z.type) out = renderOne({ ...z, id: 'live' }, p, b, rot());
   } else if (g.kind === 'marker') {
     const st = activeServeType();
     const mk = { id: 'live', type: 'marker', symbol: state.markerSymbol, color: st ? st.color : state.color, x: g.end.x, y: g.end.y };
     if (dist(g.start, g.end) > 0.5 * s) mk.from = g.start;
-    out = renderOne(mk, p, b);
+    out = renderOne(mk, p, b, rot());
   }
   gLive.innerHTML = out;
 }

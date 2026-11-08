@@ -3,7 +3,7 @@ import { I } from '../icons.js';
 import { FIELDS } from '../model.js';
 import {
   state, on, board, page, pageIndex, switchPage, addPage, makePage, copyCurrentPage, renamePage, deletePage,
-  movePage, commit, saveTemplate, pageFromTemplate, renameTemplate, deleteTemplate,
+  movePage, commit, setHalf, saveTemplate, pageFromTemplate, renameTemplate, deleteTemplate,
 } from '../store.js';
 import { thumbSVG } from '../render.js';
 import { menu, modal, promptText, confirmDlg, toast } from './dialogs.js';
@@ -30,7 +30,7 @@ function renderAll() {
     ...b.pages.map((p) =>
       h('div', { class: 'thumb' + (p.id === state.pageId ? ' active' : ''), 'data-id': p.id },
         h('div', { class: 'thumb-svg', html: thumbSVG(p, b) }),
-        h('div', { class: 'thumb-name' }, p.kind === 'angabe' ? h('span', { class: 'badge' }, 'A') : null, p.name)))
+        h('div', { class: 'thumb-name' }, p.kind === 'angabe' ? h('span', { class: 'badge' }, 'A') : null, p.half ? h('span', { class: 'badge half' }, '½') : null, p.name)))
   );
   list.querySelector('.thumb.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
@@ -106,6 +106,7 @@ function pageMenu(anchor) {
     { label: 'Umbenennen', icon: I.edit, onClick: async () => { const v = await promptText('Seite umbenennen', p.name); if (v) renamePage(p.id, v); } },
     { label: 'Duplizieren', icon: I.copy, onClick: copyCurrentPage },
     { label: 'Als Vorlage speichern', icon: I.star, onClick: async () => { const v = await promptText('Name der Vorlage', p.name); if (v) { await saveTemplate(v); toast('Vorlage gespeichert'); } } },
+    { label: p.half ? 'Ganzes Feld zeigen' : 'Nur eigene Feldhälfte', icon: I.half, onClick: () => setHalf(!p.half) },
     { label: 'Nach links', icon: I.left, disabled: i === 0, onClick: () => movePage(i, i - 1) },
     { label: 'Nach rechts', icon: I.right, disabled: i === n - 1, onClick: () => movePage(i, i + 1) },
     { label: 'Seite leeren', icon: I.clear, onClick: () => commit((pg) => (pg.elements = [])) },
@@ -146,7 +147,8 @@ export function newPageDialog() {
     body: h('div', {},
       h('div', { class: 'big-opts' },
         opt(I.rect, 'Leeres Feld', 'Clean Sheet', () => addPage(makePage('taktik'))),
-        opt(I.serve, 'Angabe-Seite', 'Ziele mit Legende', () => addPage(makePage('angabe'))),
+        opt(I.half, 'Eigene Feldhälfte', 'Nur unsere Hälfte, größer', () => addPage(makePage('taktik', true))),
+        opt(I.serve, 'Angabe-Seite', 'Ziele mit Kreuzen', () => addPage(makePage('angabe'))),
         opt(I.copy, 'Kopie dieser Seite', page().name, copyCurrentPage)),
       h('h3', {}, 'Eigene Vorlagen'),
       tplBox),

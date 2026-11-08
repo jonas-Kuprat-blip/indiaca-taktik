@@ -21,6 +21,7 @@ export const state = {
   // Ansicht
   notesOpen: false,
   theme: 'auto',
+  orientation: 'hoch', // hoch = Netz waagerecht, eigene Hälfte unten | quer
 };
 
 // ---------- Events ----------
@@ -112,7 +113,7 @@ export function touch(b = board()) {
 }
 export const flushNow = () => flush();
 
-const PREF_KEYS = ['tool', 'color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme'];
+const PREF_KEYS = ['tool', 'color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme', 'orientation'];
 const savePrefs = debounce(() => {
   const p = {};
   PREF_KEYS.forEach((k) => (p[k] = state[k]));
@@ -179,7 +180,6 @@ function normalizePage(p) {
   p.notes ||= '';
   if (!Array.isArray(p.elements)) p.elements = [];
   p.elements.forEach((e) => (e.id ||= uid()));
-  if (p.kind === 'angabe' && !Array.isArray(p.serveTypes)) p.serveTypes = clone(SERVE_TYPES);
   return p;
 }
 
@@ -253,10 +253,12 @@ export function switchPage(id) {
   rememberLast();
   emitPage();
 }
-export function makePage(kind) {
+export function makePage(kind, half = false) {
   const b = board();
   const n = b.pages.filter((p) => p.kind === kind).length + 1;
-  return newPage(kind, kind === 'angabe' ? `Angabe ${n}` : `Seite ${b.pages.length + 1}`);
+  const p = newPage(kind, kind === 'angabe' ? `Angabe ${n}` : half ? `Hälfte ${b.pages.length + 1}` : `Seite ${b.pages.length + 1}`);
+  if (half) p.half = true;
+  return p;
 }
 export function addPage(p) {
   normalizePage(p);
@@ -311,10 +313,18 @@ export function setServeTypes(types) {
   emit('elements');
   emit('ui');
 }
+// Angabearten/Legende wurden entfernt – Ziele nutzen die normale Farbe.
 export function activeServeType() {
+  return null;
+}
+export function setHalf(half) {
   const p = page();
-  if (p.kind !== 'angabe' || !p.serveTypes?.length) return null;
-  return p.serveTypes.find((t) => t.id === state.serveTypeId) || p.serveTypes[0];
+  if (half) p.half = true;
+  else delete p.half;
+  touch();
+  emit('page');
+  emit('elements');
+  emit('ui');
 }
 
 // ---------- Vorlagen ----------

@@ -56,6 +56,7 @@ export function initToolbar(root) {
   const undoBtn = btn(I.undo, 'Rückgängig', undo);
   const redoBtn = btn(I.redo, 'Wiederholen', redo);
   const notesBtn = btn(I.notes, 'Notizen', () => set({ notesOpen: !state.notesOpen }));
+  const rotBtn = btn(I.rotate, 'Feld drehen (hoch/quer)', () => set({ orientation: state.orientation === 'quer' ? 'hoch' : 'quer' }));
   const themeBtn = btn(I.theme, 'Theme', () => set({ theme: THEMES[(THEMES.indexOf(state.theme) + 1) % 3] }));
 
   const widthGroup = h('div', { class: 'group' }, widthBtns, dashBtn);
@@ -65,7 +66,7 @@ export function initToolbar(root) {
     h('div', { class: 'group colors' }, colorBtns, customBtn), h('div', { class: 'sep' }),
     widthGroup,
     h('div', { class: 'spacer' }),
-    palmBtn, undoBtn, redoBtn, notesBtn, themeBtn
+    palmBtn, undoBtn, redoBtn, rotBtn, notesBtn, themeBtn
   );
 
   const update = () => {
@@ -87,6 +88,7 @@ export function initToolbar(root) {
     notesBtn.classList.toggle('active', state.notesOpen);
     notesBtn.classList.toggle('has-dot', !!page()?.notes?.trim());
     themeBtn.title = THEME_LABEL[state.theme];
+    rotBtn.title = state.orientation === 'quer' ? 'Feld ist quer – tippen für Hochformat' : 'Feld ist hochkant – tippen für Querformat';
     if (state.theme === 'auto') delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = state.theme;
     document.getElementById('app').classList.toggle('notes-open', state.notesOpen);

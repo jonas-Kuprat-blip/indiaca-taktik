@@ -1,8 +1,8 @@
-import { h, colorCss, uid } from '../util.js';
+import { h, colorCss } from '../util.js';
 import { I } from '../icons.js';
-import { state, on, set, setTool, board, page, setTeam, setServeTypes, activeServeType } from '../store.js';
+import { state, on, set, setTool, board, setTeam } from '../store.js';
 import { dropPlayer, addPlayerDefault } from '../stage.js';
-import { promptText, colorPicker, menu, modal } from './dialogs.js';
+import { promptText, colorPicker, menu } from './dialogs.js';
 
 export function initPalette(root) {
   // --- Spieler ---
@@ -41,16 +41,8 @@ export function initPalette(root) {
   markerBtns[0].dataset.symbol = 'dot';
   markerBtns[1].dataset.symbol = 'x';
 
-  // --- Angabearten (nur Angabe-Seiten) ---
-  const serveList = h('div', { class: 'serve-list' });
-  const serveSec = h('div', { class: 'pal-sec' },
-    h('div', { class: 'pal-h' }, 'Angabeart'),
-    serveList,
-    h('button', { class: 'btn text small', onclick: editServeTypes }, 'Bearbeiten'));
-
   root.append(
     h('div', { class: 'pal-sec' }, h('div', { class: 'pal-h' }, 'Spieler'), h('div', { class: 'teams' }, teamCols.map((c) => c.col))),
-    serveSec,
     h('div', { class: 'pal-sec' }, h('div', { class: 'pal-h' }, 'Ziel / Position'), h('div', { class: 'pal-grid' }, markerBtns)),
     h('div', { class: 'pal-sec' }, h('div', { class: 'pal-h' }, 'Zonen'), h('div', { class: 'pal-grid' }, zoneBtns))
   );
@@ -65,21 +57,6 @@ export function initPalette(root) {
     }
     zoneBtns.forEach((x) => x.classList.toggle('active', state.tool === x.dataset.tool));
     markerBtns.forEach((x) => x.classList.toggle('active', state.tool === 'marker' && state.markerSymbol === x.dataset.symbol));
-    const p = page();
-    serveSec.style.display = p.kind === 'angabe' ? '' : 'none';
-    if (p.kind === 'angabe') {
-      const act = activeServeType();
-      serveList.replaceChildren(
-        ...(p.serveTypes || []).map((t) =>
-          h('button', {
-            class: 'chip' + (act?.id === t.id ? ' active' : ''),
-            onclick: () => {
-              state.serveTypeId = t.id;
-              setTool('marker');
-            },
-          }, h('span', { class: 'dot', style: { background: t.color } }), t.name))
-      );
-    }
   };
   on(['ui', 'board', 'page'], update);
 }
@@ -115,30 +92,4 @@ function bindTokenDrag(tokenEl, team, number) {
   };
   tokenEl.addEventListener('pointerup', (e) => end(e, true));
   tokenEl.addEventListener('pointercancel', (e) => end(e, false));
-}
-
-function editServeTypes() {
-  const types = (page().serveTypes || []).map((t) => ({ ...t }));
-  const list = h('div', { class: 'serve-edit' });
-  const render = () =>
-    list.replaceChildren(
-      ...types.map((t, i) => {
-        const col = h('input', { type: 'color', class: 'color-input', value: t.color });
-        col.oninput = () => (t.color = col.value);
-        const name = h('input', { class: 'input', value: t.name });
-        name.oninput = () => (t.name = name.value);
-        return h('div', { class: 'row' }, col, name,
-          h('button', { class: 'btn', 'aria-label': 'Entfernen', html: I.trash, onclick: () => { types.splice(i, 1); render(); } }));
-      }),
-      h('button', { class: 'btn text', onclick: () => { types.push({ id: uid(), name: 'Neu', color: '#64748b' }); render(); } }, '+ Angabeart')
-    );
-  render();
-  modal({
-    title: 'Angabearten & Legende',
-    body: list,
-    actions: [
-      { label: 'Abbrechen' },
-      { label: 'Speichern', primary: true, onClick: () => setServeTypes(types.map((t) => ({ ...t, name: t.name.trim() || 'Angabe' }))) },
-    ],
-  });
 }

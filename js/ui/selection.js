@@ -68,7 +68,7 @@ export function initSelectionBar(wrap) {
         h('button', { class: 'btn' + (el.symbol === 'x' ? ' active' : ''), html: I.x, 'aria-label': 'Kreuz', onclick: () => commit(() => (findEl(el.id).symbol = 'x')) }),
         textInput(el, 'label', 'Beschriftung', 12)
       );
-      if (p.kind === 'angabe' && p.serveTypes?.length) {
+      if (el.serveType && p.serveTypes?.length) {
         const s = h('select', { class: 'input sm select' }, p.serveTypes.map((t) => h('option', { value: t.id, selected: t.id === el.serveType }, t.name)));
         s.onchange = () => commit(() => (findEl(el.id).serveType = s.value));
         parts.push(s);

@@ -26,7 +26,6 @@ export const TEAM_DEFAULT = {
 
 export function newPage(kind = 'taktik', name = 'Seite') {
   const p = { id: uid(), name, kind, elements: [], notes: '' };
-  if (kind === 'angabe') p.serveTypes = clone(SERVE_TYPES);
   return p;
 }
 

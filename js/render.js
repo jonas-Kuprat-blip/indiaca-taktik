@@ -4,13 +4,21 @@ import { esc, colorCss } from './util.js';
 
 const f = (n) => Math.round(n * 1000) / 1000;
 
-export function viewBox(ft) {
+/** Sichtbereich in Modellkoordinaten; half = nur eigene Hälfte; rot = 90 → Hochformat (eigene Hälfte unten) */
+export function modelBox(ft, half = false) {
   const F = FIELDS[ft], m = F.margin;
-  return `${-F.length / 2 - m} ${-F.width / 2 - m} ${F.length + 2 * m} ${F.width + 2 * m}`;
+  return { x0: -F.length / 2 - m, x1: half ? 0.8 : F.length / 2 + m, y0: -F.width / 2 - m, y1: F.width / 2 + m };
 }
+export function viewBox(ft, half = false, rot = 0) {
+  const { x0, x1, y0, y1 } = modelBox(ft, half);
+  if (rot) return `${y0} ${-x1} ${y1 - y0} ${x1 - x0}`;
+  return `${x0} ${y0} ${x1 - x0} ${y1 - y0}`;
+}
+/** Transformation der Welt-Gruppe (Modell → Ansicht) */
+export const worldTransform = (rot) => (rot ? 'rotate(-90)' : '');
 
 // ---------- Feld ----------
-export function renderField(b) {
+export function renderField(b, rot = 0) {
   const F = FIELDS[b.fieldType];
   const L = F.length, W = F.width, a = F.attack, m = F.margin, s = F.s;
   const x0 = -L / 2 - m, y0 = -W / 2 - m;
@@ -24,9 +32,14 @@ export function renderField(b) {
   <line class="f-net" x1="0" y1="${-W / 2 - 0.45}" x2="0" y2="${W / 2 + 0.45}"/>
   <circle class="f-post" cx="0" cy="${-W / 2 - 0.45}" r="0.1"/>
   <circle class="f-post" cx="0" cy="${W / 2 + 0.45}" r="0.1"/>
-  <text class="f-label" x="${-L / 4}" y="${ly}" font-size="${0.42 * s}" text-anchor="middle" dominant-baseline="central">${esc(b.teams.own.name)}</text>
-  <text class="f-label" x="${L / 4}" y="${ly}" font-size="${0.42 * s}" text-anchor="middle" dominant-baseline="central">${esc(b.teams.opp.name)}</text>`;
+  ${teamLabel(b.teams.own.name, rot ? -(L / 2 + m * 0.45) : -L / 4, rot ? 0 : ly, s, rot)}
+  ${teamLabel(b.teams.opp.name, rot ? L / 2 + m * 0.45 : L / 4, rot ? 0 : ly, s, rot)}`;
 }
+
+const teamLabel = (name, x, y, s, rot) =>
+  `<text class="f-label" x="${f(x)}" y="${f(y)}" font-size="${0.42 * s}" text-anchor="middle" dominant-baseline="central"${
+    rot ? ` transform="rotate(${rot} ${f(x)} ${f(y)})"` : ''
+  }>${esc(name)}</text>`;
 
 // ---------- Elemente ----------
 const strokeCache = new Map();
@@ -69,12 +82,12 @@ export function symbolMarkup(symbol, color, s) {
   return `<path d="${d}" class="mk-halo" style="stroke-width:${f(0.2 * s)}"/><path d="${d}" style="stroke:${c};stroke-width:${f(0.11 * s)};stroke-linecap:round"/>`;
 }
 
-export function renderOne(el, page, b) {
+export function renderOne(el, page, b, rot = 0) {
   const s = FIELDS[b.fieldType].s;
   switch (el.type) {
     case 'player': {
       const R = 0.4 * s;
-      return `<g class="el pl" data-id="${el.id}" transform="translate(${f(el.x)} ${f(el.y)})">
+      return `<g class="el pl" data-id="${el.id}" transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}">
         <circle r="${R}" class="pl-c" style="fill:${colorCss(el.color)}"/>
         <text class="pl-n" font-size="${f(R * (String(el.number).length > 2 ? 0.7 : 0.95))}" text-anchor="middle" dominant-baseline="central">${esc(el.number)}</text>
         ${el.label ? `<text class="lbl" y="${f(R + 0.32 * s)}" font-size="${f(0.32 * s)}" text-anchor="middle" dominant-baseline="central">${esc(el.label)}</text>` : ''}
@@ -104,38 +117,21 @@ export function renderOne(el, page, b) {
         from = `<circle cx="${f(el.from.x)}" cy="${f(el.from.y)}" r="${f(0.12 * s)}" style="fill:${colorCss(c)}"/>` +
           arrowMarkup(el.from.x, el.from.y, el.x - (dx / l) * gap, el.y - (dy / l) * gap, c, 0.06 * s, true);
       }
-      return `<g class="el mk" data-id="${el.id}">${from}<g transform="translate(${f(el.x)} ${f(el.y)})"><circle class="hit-a" r="${f(0.45 * s)}"/>${symbolMarkup(el.symbol, c, s)}</g>${
+      return `<g class="el mk" data-id="${el.id}">${from}<g transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}"><circle class="hit-a" r="${f(0.45 * s)}"/>${symbolMarkup(el.symbol, c, s)}${
         el.label
-          ? `<text class="lbl" x="${f(el.x + 0.34 * s)}" y="${f(el.y - 0.34 * s)}" font-size="${f(0.32 * s)}" dominant-baseline="central">${esc(el.label)}</text>`
+          ? `<text class="lbl" x="${f(0.34 * s)}" y="${f(-0.34 * s)}" font-size="${f(0.32 * s)}" dominant-baseline="central">${esc(el.label)}</text>`
           : ''
-      }</g>`;
+      }</g></g>`;
     }
   }
   return '';
 }
 
 const ORDER = { zone: 0, stroke: 1, arrow: 2, marker: 3, player: 4 };
-export function renderElements(page, b) {
+export function renderElements(page, b, rot = 0) {
   if (!page) return '';
   const els = [...page.elements].sort((a, c) => (ORDER[a.type] ?? 9) - (ORDER[c.type] ?? 9));
-  let out = els.map((e) => renderOne(e, page, b)).join('');
-  if (page.kind === 'angabe') out += renderLegend(page, b);
-  return out;
-}
-
-function renderLegend(page, b) {
-  const F = FIELDS[b.fieldType], s = F.s;
-  const y = F.width / 2 + F.margin * 0.5;
-  const fs = 0.36 * s;
-  let x = -F.length / 2 + 0.25;
-  const parts = (page.serveTypes || []).map((t) => {
-    const n = page.elements.filter((e) => e.type === 'marker' && e.serveType === t.id).length;
-    const label = `${t.name}${n ? ` (${n})` : ''}`;
-    const g = `<g transform="translate(${f(x)} ${f(y)})">${symbolMarkup('x', t.color, s * 0.85)}<text class="lg-t" x="${f(0.42 * s)}" font-size="${fs}" dominant-baseline="central">${esc(label)}</text></g>`;
-    x += 0.42 * s + fs * 0.58 * label.length + 0.7 * s;
-    return g;
-  });
-  return `<g class="legend">${parts.join('')}</g>`;
+  return els.map((e) => renderOne(e, page, b, rot)).join('');
 }
 
 // ---------- Auswahl-Overlay ----------
@@ -167,5 +163,5 @@ export function renderSelection(el, page, b) {
 }
 
 export function thumbSVG(page, b) {
-  return `<svg viewBox="${viewBox(b.fieldType)}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${renderField(b)}${renderElements(page, b)}</svg>`;
+  return `<svg viewBox="${viewBox(b.fieldType, page.half)}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${renderField(b)}${renderElements(page, b)}</svg>`;
 }

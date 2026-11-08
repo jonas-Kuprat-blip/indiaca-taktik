@@ -30,5 +30,7 @@ export const I = {
   palm: svg('<path d="M4 20l1-4.5L16.5 4a2.1 2.1 0 0 1 3 3L8 18.5z"/><path d="M3 3l18 18" stroke-width="1.6"/>'),
   dash: svg('<path d="M4 12h3M10.5 12h3M17 12h3" stroke-width="3"/>'),
   clear: svg('<path d="M4 4h16v16H4z"/><path d="M9 9l6 6M15 9l-6 6"/>'),
+  rotate: svg('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>'),
+  half: svg('<rect x="4" y="3.5" width="16" height="17" rx="1.5"/><path d="M2.5 9h19" stroke-width="2.6"/><path d="M4 14h16" stroke-dasharray="2 2"/>'),
   serve: svg('<circle cx="6" cy="18" r="2"/><path d="M7.5 16.5L17 7" stroke-dasharray="2 2.5"/><path d="M14 4l6 6M20 4l-6 6"/>'),
 };

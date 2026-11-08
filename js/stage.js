@@ -21,7 +21,7 @@ let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar;
 let drawnKey = '';
 const gestures = new Map(); // pointerId → Geste
 const rot = () => (pageOrientation() === 'quer' ? 0 : 90);
-const ONE_SHOT = ['marker', 'arrow', 'rect', 'tri', 'circle', 'free'];
+const ONE_SHOT = ['marker', 'arrow', 'rect', 'tri', 'cone', 'circle', 'free'];
 
 // ---------- Kamera (komplexe Zahl m = Zoom·e^(i·Winkel), b = Verschiebung) ----------
 const cam = { mr: 1, mi: 0, bx: 0, by: 0 };
@@ -146,7 +146,7 @@ function drawField() {
   drawnKey = k;
   svg.setAttribute('viewBox', viewBox(b.fieldType, page().half, rot()));
   gWorld.setAttribute('transform', worldTransform(rot()));
-  gField.innerHTML = renderField(b);
+  gField.innerHTML = renderField(b, rot());
   // Alles außerhalb des Feldbereichs (z. B. gegnerische Hälfte) abschneiden
   const mb = modelBox(b.fieldType, page().half);
   const cr = svg.querySelector('#vclip-r');
@@ -282,6 +282,7 @@ function down(e) {
       break;
     case 'rect':
     case 'tri':
+    case 'cone':
     case 'circle':
     case 'free':
       Object.assign(g, { kind: 'zone', shape: tool, end: pt, cx1: e.clientX, cy1: e.clientY, points: [[pt.x, pt.y]] });
@@ -550,6 +551,14 @@ function zoneFrom(g, m) {
     return { ...base, shape: 'poly', points: corners.map(([cx, cy]) => { const p = toW(m, cx, cy); return [r3(p.x), r3(p.y)]; }) };
   }
   const a = g.start, b = g.end;
+  if (g.shape === 'cone') {
+    // Blickrichtung: Spitze am Startpunkt, Öffnung (±25°) Richtung Endpunkt
+    const len = dist(a, b);
+    if (len < 0.4) return null;
+    const ang = Math.atan2(b.y - a.y, b.x - a.x), sp = (25 * Math.PI) / 180;
+    const arm = (d) => [r3(a.x + Math.cos(ang + d) * len), r3(a.y + Math.sin(ang + d) * len)];
+    return { ...base, color: state.color === 'ink' ? '#facc15' : state.color, opacity: 0.2, shape: 'poly', vee: true, points: [arm(-sp), [r3(a.x), r3(a.y)], arm(sp)] };
+  }
   if (g.shape === 'circle') {
     const r = dist(a, b);
     if (r < 0.15) return null;

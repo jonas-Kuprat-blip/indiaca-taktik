@@ -18,7 +18,7 @@ export function initPalette(root) {
     b.dataset.tool = tool;
     return b;
   };
-  const zoneBtns = [toolBtn('rect', I.rect, 'Rechteck'), toolBtn('tri', I.tri, 'Dreieck'), toolBtn('circle', I.circle, 'Kreis'), toolBtn('free', I.free, 'Freiform')];
+  const zoneBtns = [toolBtn('rect', I.rect, 'Rechteck'), toolBtn('tri', I.tri, 'Dreieck'), toolBtn('cone', I.cone, 'Blick'), toolBtn('circle', I.circle, 'Kreis'), toolBtn('free', I.free, 'Freiform')];
   const markerBtns = [
     toolBtn('marker', I.dot, 'Punkt', () => set({ markerSymbol: 'dot' })),
     toolBtn('marker', I.x, 'Kreuz', () => set({ markerSymbol: 'x' })),

@@ -18,12 +18,13 @@ export function viewBox(ft, half = false, rot = 0) {
 export const worldTransform = (rot) => (rot ? 'rotate(-90)' : '');
 
 // ---------- Feld ----------
-export function renderField(b) {
+export function renderField(b, rot = 0) {
   const F = FIELDS[b.fieldType];
   const L = F.length, W = F.width, a = F.attack, m = F.margin;
   const x0 = -L / 2 - m, y0 = -W / 2 - m;
   return `<rect class="f-out" x="${x0}" y="${y0}" width="${L + 2 * m}" height="${W + 2 * m}"/>
   <rect class="f-court" x="${-L / 2}" y="${-W / 2}" width="${L}" height="${W}"/>
+  ${logoMark(F, rot)}
   ${['f-edge', 'f-line'].map((c) => `
   <line class="${c}" x1="${-a}" y1="${-W / 2}" x2="${-a}" y2="${W / 2}"/>
   <line class="${c}" x1="${a}" y1="${-W / 2}" x2="${a}" y2="${W / 2}"/>
@@ -31,6 +32,12 @@ export function renderField(b) {
   <line class="f-net" x1="0" y1="${-W / 2 - 0.45}" x2="0" y2="${W / 2 + 0.45}"/>
   <circle class="f-post" cx="0" cy="${-W / 2 - 0.45}" r="0.1"/>
   <circle class="f-post" cx="0" cy="${W / 2 + 0.45}" r="0.1"/>`;
+}
+
+/** Vereinslogo leicht transparent auf der eigenen Feldhälfte, immer aufrecht lesbar */
+function logoMark(F, rot) {
+  const w = Math.min(F.width * 0.85, F.length / 2 * 0.8), hgt = w / 1.95;
+  return `<image class="f-logo" href="img/logo.jpg" x="${f(-w / 2)}" y="${f(-hgt / 2)}" width="${f(w)}" height="${f(hgt)}" preserveAspectRatio="xMidYMid meet" transform="translate(${f(-F.length / 4)} 0)${rot ? ` rotate(${rot})` : ''}"/>`;
 }
 
 // ---------- Elemente ----------
@@ -86,15 +93,21 @@ export function renderOne(el, page, b, rot = 0) {
   const s = FIELDS[b.fieldType].s;
   switch (el.type) {
     case 'player': {
-      const R = 0.55 * s;
+      const k = el.size || 1;
+      const R = 0.45 * s * k;
       return `<g class="el pl" data-id="${el.id}" transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}">
-        <circle r="${R}" class="pl-hit"/>${playerIcon(el.color, s * 1.35)}
+        <circle r="${f(R)}" class="pl-hit"/>${playerIcon(el.color, s * k)}
         ${el.label ? `<text class="lbl" y="${f(R + 0.28 * s)}" font-size="${f(0.32 * s)}" text-anchor="middle" dominant-baseline="central">${esc(el.label)}</text>` : ''}
       </g>`;
     }
     case 'zone': {
       const c = colorCss(el.color);
       const st = `style="fill:${c};fill-opacity:${el.opacity};stroke:${c};stroke-opacity:.85;stroke-width:${f(0.05 * s)}"`;
+      if (el.vee) {
+        const P = el.points.map((p) => `${f(p[0])} ${f(p[1])}`);
+        return `<g class="el zn" data-id="${el.id}"><path d="M${P.join('L')}Z" style="fill:${c};fill-opacity:${el.opacity};stroke:none"/>` +
+          `<path class="vee" d="M${P.join('L')}" style="stroke:${c};stroke-width:${f(0.08 * s)}"/></g>`;
+      }
       if (el.shape === 'circle')
         return `<circle class="el zn" data-id="${el.id}" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(el.r)}" ${st}/>`;
       return `<path class="el zn" data-id="${el.id}" d="M${el.points.map((p) => `${f(p[0])} ${f(p[1])}`).join('L')}Z" ${st}/>`;
@@ -140,7 +153,7 @@ export function renderSelection(el, page, b) {
   const pad = 0.12 * s;
   switch (el.type) {
     case 'player':
-      return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.55 * s + pad)}"/>`;
+      return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.45 * s * (el.size || 1) + pad)}"/>`;
     case 'marker':
       return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.36 * s)}"/>` + (el.from ? handle('from', el.from.x, el.from.y, s) : '');
     case 'arrow':

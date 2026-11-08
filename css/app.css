@@ -121,6 +121,8 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 .f-att { stroke-width: .08; }
 .f-net { stroke: var(--net); stroke-width: .13; stroke-linecap: round; }
 .f-post { fill: var(--net); }
+.f-logo { opacity: .2; mix-blend-mode: multiply; pointer-events: none; }
+.vee { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .f-label { fill: var(--muted); font-weight: 700; }
 #g-field, #g-live, .st, .legend, .legend * { pointer-events: none; }
 .pl-b { stroke: #ffffff; stroke-width: .05; paint-order: stroke; stroke-linejoin: round; }

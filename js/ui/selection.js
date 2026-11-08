@@ -61,7 +61,10 @@ export function initSelectionBar(wrap) {
     }
     const parts = [];
     if (el.type === 'player') {
-      parts.push(textInput(el, 'label', 'Name (optional)', 12), swatches(el), dup(el));
+      const sz = h('input', { type: 'range', min: '0.5', max: '2', step: '0.1', value: el.size || 1, class: 'range', 'aria-label': 'Größe' });
+      sz.addEventListener('pointerdown', snapshot);
+      sz.addEventListener('input', () => { findEl(el.id).size = +sz.value; changed(); });
+      parts.push(lbl('Größe'), sz, textInput(el, 'label', 'Name (optional)', 10), swatches(el), dup(el));
     } else if (el.type === 'marker') {
       const p = page();
       parts.push(
@@ -96,6 +99,7 @@ export function initSelectionBar(wrap) {
     let t = '';
     if (!state.selectionId) {
       if (state.tool === 'marker') t = 'Tippen: Ziel setzen · Ziehen: Ziel mit Pfeil vom Startpunkt';
+      else if (state.tool === 'cone') t = 'Vom Spieler aus in Blickrichtung ziehen';
       else if (['rect', 'tri', 'circle', 'free'].includes(state.tool)) t = 'Ziehen, um die Form aufzuziehen';
       else if (state.tool === 'select') t = 'Antippen: auswählen · Ziehen: verschieben · 2 Finger: zoomen & drehen';
       else if (p.kind === 'angabe' && state.tool !== 'eraser') t = '';

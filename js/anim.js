@@ -1,6 +1,6 @@
 import { h, uid, clone } from './util.js';
 import { I } from './icons.js';
-import { FIELDS, newPage, ensureAnim } from './model.js';
+import { FIELDS, newPage, ensureAnim, ANIM_TYPES } from './model.js';
 import { state, on, emit, board, page, commit, touch, pageOrientation } from './store.js';
 import { renderOne } from './render.js';
 import * as stage from './stage.js';
@@ -8,44 +8,36 @@ import { menu } from './ui/dialogs.js';
 
 /*
  * Animationsseiten (kind = 'anim').
- * Bearbeiten: Die Spieler des aktuellen Schritts liegen als normale Spieler in page.elements – dadurch
- * funktionieren Verschieben, Größe, Farbe, Mülleimer usw. unverändert. Jede Änderung wird sofort in
- * page.anim.steps[cur] übernommen (capture).
- * Wiedergabe: page.elements bleibt unangetastet; die Bühne zeigt per Override interpolierte Positionen.
+ * Bearbeiten: Die Elemente des aktuellen Schritts liegen als normale Elemente in page.elements – dadurch
+ * funktionieren Verschieben, Größe, Drehen, Farbe, Mülleimer usw. unverändert. Jede Änderung wird sofort
+ * in page.anim.steps[cur].els übernommen (capture).
+ * Wiedergabe: page.elements bleibt unangetastet; die Bühne zeigt per Override interpolierte Elemente
+ * (Position, Größe, Form, Deckkraft).
  */
 
 const HOLD = 0.45; // kurze Pause auf jedem Schritt (Sekunden)
-const SPEEDS = [0.5, 1, 2];
+const SPEEDS = [0.1, 0.25, 0.5, 1];
 const DURS = [0.5, 1, 1.5, 2, 3];
-const play = { on: false, t: 0, speed: 1, loop: false, trails: false, raf: 0, last: 0, shown: 0 };
+const play = { on: false, t: 0, speed: 0.5, loop: false, trails: false, raf: 0, last: 0, shown: 0 };
 
 export const isAnim = (p = page()) => p?.kind === 'anim';
-const playersOf = (p) => p.elements.filter((e) => e.type === 'player');
+const animEls = (p) => p.elements.filter((e) => ANIM_TYPES.includes(e.type));
+const isStatic = (e) => !ANIM_TYPES.includes(e.type);
 
 // ---------- Schritte ↔ Elemente ----------
-/** Aktuelle Spieler in den aktuellen Schritt übernehmen */
+/** Aktuelle Elemente in den aktuellen Schritt übernehmen */
 export function capture(p = page()) {
   if (!isAnim(p)) return;
   ensureAnim(p);
-  const a = p.anim;
-  const st = a.steps[a.cur];
-  st.pos = {};
-  for (const e of playersOf(p)) {
-    st.pos[e.id] = [e.x, e.y];
-    a.actors[e.id] = { team: e.team, color: e.color, size: e.size || 1, label: e.label || '', number: e.number || '' };
-  }
-  // Actors, die in keinem Schritt mehr vorkommen, entfernen
-  for (const id of Object.keys(a.actors)) if (!a.steps.some((s) => s.pos[id])) delete a.actors[id];
+  const st = p.anim.steps[p.anim.cur];
+  st.els = {};
+  for (const e of animEls(p)) st.els[e.id] = clone(e);
 }
 /** Schritt i auf das Feld laden */
 function load(p, i) {
   const a = p.anim;
   a.cur = Math.max(0, Math.min(i, a.steps.length - 1));
-  const st = a.steps[a.cur];
-  const players = Object.entries(st.pos)
-    .filter(([id]) => a.actors[id])
-    .map(([id, [x, y]]) => ({ id, type: 'player', ...a.actors[id], x, y }));
-  p.elements = p.elements.filter((e) => e.type !== 'player').concat(players);
+  p.elements = p.elements.filter(isStatic).concat(Object.values(a.steps[a.cur].els).map(clone));
 }
 function refresh() {
   state.selectionId = null;
@@ -72,7 +64,7 @@ function stepOp(fn) {
 }
 export const addStep = () =>
   stepOp((p, a) => {
-    a.steps.splice(a.cur + 1, 0, { id: uid(), note: '', dur: 1, pos: clone(a.steps[a.cur].pos) });
+    a.steps.splice(a.cur + 1, 0, { id: uid(), note: '', dur: 1, els: clone(a.steps[a.cur].els) });
     load(p, a.cur + 1);
   });
 const dupStep = (i) =>
@@ -82,7 +74,7 @@ const dupStep = (i) =>
   });
 const insertBefore = (i) =>
   stepOp((p, a) => {
-    a.steps.splice(i, 0, { id: uid(), note: '', dur: 1, pos: clone(a.steps[i].pos) });
+    a.steps.splice(i, 0, { id: uid(), note: '', dur: 1, els: clone(a.steps[i].els) });
     load(p, i);
   });
 const delStep = (i) =>
@@ -99,12 +91,12 @@ const moveStep = (i, d) =>
     load(p, j);
   });
 
-/** Neue Animationsseite – Spieler der aktuellen Seite werden zu Schritt 1 */
+/** Neue Animationsseite – Spieler und Marker (z. B. Indiaca) der aktuellen Seite werden zu Schritt 1 */
 export function makeAnimPage() {
   const src = page();
   const n = board().pages.filter((p) => p.kind === 'anim').length + 1;
   const p = newPage('anim', `Animation ${n}`);
-  p.elements = playersOf(src).map((e) => ({ ...clone(e), id: uid() }));
+  p.elements = src.elements.filter((e) => e.type === 'player' || e.type === 'marker').map((e) => ({ ...clone(e), id: uid() }));
   p.orientation = pageOrientation(src);
   if (src.half) p.half = true;
   ensureAnim(p);
@@ -134,24 +126,33 @@ function at(a, t) {
 }
 const startOf = (a, i) => (i <= 0 ? 0 : timeline(a).segs[i - 1].t0 + HOLD + a.steps[i].dur);
 
+/** Zwischenstand zweier Elemente (Position, Größe, Form, Deckkraft); Farbe/Symbol wechseln zur Hälfte */
+const NUM = ['x', 'y', 'r', 'opacity', 'x1', 'y1', 'x2', 'y2', 'width'];
+function lerpEl(A, B, u) {
+  const o = { ...(u < 0.5 ? A : B) };
+  const L = (p, q) => p + (q - p) * u;
+  for (const k of NUM) if (typeof A[k] === 'number' && typeof B[k] === 'number') o[k] = L(A[k], B[k]);
+  if (A.type === 'player' || A.type === 'marker') o.size = L(A.size || 1, B.size || 1);
+  if (A.points && B.points && A.points.length === B.points.length) o.points = A.points.map((p, i) => [L(p[0], B.points[i][0]), L(p[1], B.points[i][1])]);
+  if (A.from && B.from) o.from = { x: L(A.from.x, B.from.x), y: L(A.from.y, B.from.y) };
+  return o;
+}
+
 function frame() {
   const p = page();
   const a = p.anim;
   const { from, to, u } = at(a, play.t);
   const e = ease(u);
-  const A = a.steps[from].pos, B = a.steps[to].pos;
-  const ids = new Set([...Object.keys(A), ...Object.keys(B)]);
-  const players = [];
-  for (const id of ids) {
-    const act = a.actors[id];
-    if (!act) continue;
-    const pa = A[id], pb = B[id];
-    if (pa && pb) players.push({ id, type: 'player', ...act, x: pa[0] + (pb[0] - pa[0]) * e, y: pa[1] + (pb[1] - pa[1]) * e });
-    else if (pa) players.push({ id, type: 'player', ...act, x: pa[0], y: pa[1], fade: 1 - e });
-    else players.push({ id, type: 'player', ...act, x: pb[0], y: pb[1], fade: e });
-  }
+  const A = a.steps[from].els, B = a.steps[to].els;
+  const ids = [...new Set([...Object.keys(A), ...Object.keys(B)])];
+  const els = ids.map((id) => {
+    const ea = A[id], eb = B[id];
+    if (ea && eb) return lerpEl(ea, eb, e);
+    if (ea) return { ...ea, fade: 1 - e };
+    return { ...eb, fade: e };
+  });
   play.shown = u >= 0.5 ? to : from;
-  return { ...p, elements: p.elements.filter((x) => x.type !== 'player').concat(players) };
+  return { ...p, elements: p.elements.filter(isStatic).concat(els) };
 }
 
 function tick(now) {
@@ -203,6 +204,7 @@ export function stop(jump = true, toStep = null) {
 }
 
 // ---------- Geister & Laufwege ----------
+const MOVERS = ['player', 'marker'];
 function ghosts(rot) {
   const p = page();
   if (!isAnim(p)) return '';
@@ -211,22 +213,25 @@ function ghosts(rot) {
   const s = FIELDS[b.fieldType].s;
   let out = '';
   if (play.trails) {
-    for (const id of Object.keys(a.actors)) {
-      const pts = a.steps.map((st) => st.pos[id]).filter(Boolean);
+    const ids = new Set(a.steps.flatMap((st) => Object.keys(st.els)));
+    for (const id of ids) {
+      const pts = a.steps.map((st) => st.els[id]).filter((e) => e && MOVERS.includes(e.type));
       if (pts.length < 2) continue;
-      out += `<path class="trail" d="M${pts.map((q) => `${q[0]} ${q[1]}`).join('L')}" style="stroke:${a.actors[id].color};stroke-width:${0.06 * s}"/>`;
+      const col = pts[0].type === 'marker' && pts[0].symbol === 'indiaca' ? '#dc2626' : pts[0].color === 'ink' ? '#111827' : pts[0].color;
+      out += `<path class="trail" d="M${pts.map((q) => `${q.x} ${q.y}`).join('L')}" style="stroke:${col};stroke-width:${0.06 * s}"/>`;
     }
   }
   if (play.on || a.cur === 0) return out;
-  // Vorheriger Schritt als blasse Geister + Pfeil zur neuen Position
-  const prev = a.steps[a.cur - 1].pos, cur = a.steps[a.cur].pos;
+  // Vorheriger Schritt als blasse Geister + Pfeil zur neuen Position (Spieler und Marker)
+  const prev = a.steps[a.cur - 1].els, cur = a.steps[a.cur].els;
   for (const [id, q] of Object.entries(prev)) {
-    const act = a.actors[id];
-    if (!act) continue;
-    out += renderOne({ id: 'g' + id, type: 'player', ...act, label: '', x: q[0], y: q[1], fade: 0.3 }, p, b, rot);
+    if (!MOVERS.includes(q.type)) continue;
+    out += `<g style="opacity:.3">${renderOne({ ...q, id: 'g' + id, label: '', from: undefined }, p, b, rot)}</g>`;
     const n = cur[id];
-    if (n && Math.hypot(n[0] - q[0], n[1] - q[1]) > 0.2)
-      out += renderOne({ id: 'ga' + id, type: 'arrow', x1: q[0], y1: q[1], x2: n[0], y2: n[1], color: act.color, width: 0.05 * s, dashed: true }, p, b, rot);
+    if (n && Math.hypot(n.x - q.x, n.y - q.y) > 0.2) {
+      const col = q.type === 'marker' && q.symbol === 'indiaca' ? '#dc2626' : q.color;
+      out += renderOne({ id: 'ga' + id, type: 'arrow', x1: q.x, y1: q.y, x2: n.x, y2: n.y, color: col, width: 0.05 * s, dashed: true }, p, b, rot);
+    }
   }
   return out;
 }
@@ -303,6 +308,7 @@ function updateBar() {
   prevBtn.disabled = play.on ? false : a.cur === 0;
   nextBtn.disabled = play.on ? false : a.cur >= a.steps.length - 1;
   speedBtn.textContent = `${String(play.speed).replace('.', ',')}×`;
+  speedBtn.title = 'Tempo (0,1× langsam … 1× schnell)';
   loopBtn.classList.toggle('active', play.loop);
   trailsBtn.classList.toggle('active', play.trails);
   bar.classList.toggle('playing', play.on);
@@ -324,12 +330,14 @@ function updateNote() {
 // ---------- Beispielvorlagen ----------
 function example(name, steps) {
   const b = board();
-  const actors = {};
-  for (const st of steps) for (const id of Object.keys(st.pos)) {
-    const team = id[0] === 'o' ? 'opp' : 'own';
-    actors[id] = { team, color: b.teams[team].color, size: 1, label: '', number: '' };
-  }
-  const pg = { id: uid(), kind: 'anim', name, notes: '', elements: [], anim: { actors, steps: steps.map((s) => ({ id: uid(), dur: 1, ...s })), cur: 0 } };
+  const mk = (id, [x, y]) =>
+    id === 'ball'
+      ? { id, type: 'marker', symbol: 'indiaca', color: '#dc2626', label: '', size: 1, x, y }
+      : { id, type: 'player', team: id[0] === 'o' ? 'opp' : 'own', color: b.teams[id[0] === 'o' ? 'opp' : 'own'].color, size: 1, label: '', number: '', x, y };
+  const pg = {
+    id: uid(), kind: 'anim', name, notes: '', elements: [],
+    anim: { cur: 0, steps: steps.map((s) => ({ id: uid(), dur: 1, note: s.note, ...(s.dur ? { dur: s.dur } : {}), els: Object.fromEntries(Object.entries(s.pos).map(([id, xy]) => [id, mk(id, xy)])) })) },
+  };
   load(pg, 0);
   return { id: 'ex-' + name, name, builtin: true, fieldType: b.fieldType, page: pg };
 }
@@ -337,9 +345,10 @@ const OPP = { o1: [5.5, -2], o2: [6, 0], o3: [5.5, 2], o4: [2, -1.4], o5: [2, 1.
 export function exampleTemplates() {
   return [
     example('K1: Annahme → Aufbau → Angriff', [
-      { note: 'Annahme: drei hinten, Steller vorne', pos: { a1: [-6, -2], a2: [-6.4, 0], a3: [-6, 2], a4: [-3.2, -1.3], a5: [-1.5, 1.8], ...OPP } },
-      { note: 'Pass zum Steller, Angreifer läuft an', dur: 1.2, pos: { a1: [-5.6, -2.2], a2: [-5.2, 0.2], a3: [-5.6, 2.2], a4: [-2.6, -2], a5: [-0.9, 0.4], ...OPP } },
-      { note: 'Angriff über links, Rest sichert ab', pos: { a1: [-4.2, -2], a2: [-4.6, 0.2], a3: [-4.2, 2], a4: [-0.7, -1.8], a5: [-1.6, 0.6], ...OPP } },
+      { note: 'Annahme: drei hinten, Steller vorne', pos: { a1: [-6, -2], a2: [-6.4, 0], a3: [-6, 2], a4: [-3.2, -1.3], a5: [-1.5, 1.8], ...OPP, ball: [-5.9, 0.2] } },
+      { note: 'Pass zum Steller, Angreifer läuft an', dur: 1.2, pos: { a1: [-5.6, -2.2], a2: [-5.2, 0.2], a3: [-5.6, 2.2], a4: [-2.6, -2], a5: [-0.9, 0.4], ...OPP, ball: [-0.6, 0.6] } },
+      { note: 'Angriff über links, Rest sichert ab', pos: { a1: [-4.2, -2], a2: [-4.6, 0.2], a3: [-4.2, 2], a4: [-0.7, -1.8], a5: [-1.6, 0.6], ...OPP, ball: [-0.3, -1.8] } },
+      { note: 'Schlag ins gegnerische Feld', dur: 0.6, pos: { a1: [-4.2, -2], a2: [-4.6, 0.2], a3: [-4.2, 2], a4: [-0.7, -1.8], a5: [-1.6, 0.6], ...OPP, ball: [4.2, 1.6] } },
     ]),
     example('K2: Grundstellung → Block/Abwehr', [
       { note: 'Grundstellung', pos: { a1: [-5.5, -2], a2: [-6.2, 0], a3: [-5.5, 2], a4: [-1.4, -1.4], a5: [-1.4, 1.4], o1: [5.5, -2], o2: [6, 0], o3: [5.5, 2], o4: [1.8, -1.5], o5: [1.2, 1.2] } },
@@ -347,8 +356,8 @@ export function exampleTemplates() {
       { note: 'Doppelblock links, Abwehr dahinter', pos: { a1: [-4.6, -2.4], a2: [-5.6, -0.4], a3: [-3.8, 1.2], a4: [-0.4, -2.2], a5: [-0.4, -1.2], o1: [5.2, -2], o2: [5.8, 0], o3: [5.2, 2], o4: [0.6, -2], o5: [0.8, 0] } },
     ]),
     example('Angabe → Annahme', [
-      { note: 'Gegner schlägt auf', pos: { a1: [-6, -2], a2: [-6.4, 0], a3: [-6, 2], a4: [-2.5, -1.5], a5: [-2.5, 1.5], o1: [7.6, 1.5], o2: [5, 0], o3: [4.5, 2], o4: [1.6, -1.4], o5: [1.6, 1.4] } },
-      { note: 'Annahme rechts hinten, Steller löst sich', pos: { a1: [-5.4, -1.6], a2: [-6.2, 0.6], a3: [-6.8, 2.3], a4: [-2.8, -1.8], a5: [-1, 0.8], o1: [6, 1.5], o2: [5, 0], o3: [4.5, 2], o4: [1.6, -1.4], o5: [1.6, 1.4] } },
+      { note: 'Gegner schlägt auf', pos: { a1: [-6, -2], a2: [-6.4, 0], a3: [-6, 2], a4: [-2.5, -1.5], a5: [-2.5, 1.5], o1: [7.6, 1.5], o2: [5, 0], o3: [4.5, 2], o4: [1.6, -1.4], o5: [1.6, 1.4], ball: [8.1, 1.5] } },
+      { note: 'Annahme rechts hinten, Steller löst sich', dur: 1.4, pos: { a1: [-5.4, -1.6], a2: [-6.2, 0.6], a3: [-6.8, 2.3], a4: [-2.8, -1.8], a5: [-1, 0.8], o1: [6, 1.5], o2: [5, 0], o3: [4.5, 2], o4: [1.6, -1.4], o5: [1.6, 1.4], ball: [-6.6, 2.0] } },
     ]),
   ];
 }

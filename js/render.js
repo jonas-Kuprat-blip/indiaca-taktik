@@ -97,7 +97,7 @@ export function renderOne(el, page, b, rot = 0) {
     case 'player': {
       const k = el.size || 1;
       const R = 0.45 * s * k;
-      return `<g class="el pl" data-id="${el.id}" transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}"${el.fade != null ? ` style="opacity:${f(el.fade)}"` : ''}>
+      return `<g class="el pl" data-id="${el.id}" transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}">
         <circle r="${f(R)}" class="pl-hit"/>${playerIcon(el.color, s * k)}
         ${el.label ? `<text class="lbl" y="${f(R + 0.28 * s)}" font-size="${f(0.32 * s)}" text-anchor="middle" dominant-baseline="central">${esc(el.label)}</text>` : ''}
       </g>`;
@@ -144,7 +144,7 @@ const ORDER = { zone: 0, stroke: 1, arrow: 2, marker: 3, player: 4 };
 export function renderElements(page, b, rot = 0) {
   if (!page) return '';
   const els = [...page.elements].sort((a, c) => (ORDER[a.type] ?? 9) - (ORDER[c.type] ?? 9));
-  return els.map((e) => renderOne(e, page, b, rot)).join('');
+  return els.map((e) => (e.fade != null ? `<g style="opacity:${f(e.fade)}">${renderOne(e, page, b, rot)}</g>` : renderOne(e, page, b, rot))).join('');
 }
 
 // ---------- Auswahl-Overlay ----------

@@ -32,7 +32,7 @@ const ROLE_LABEL = { angriff: 'Angreifer', zuspiel: 'Zuspieler' };
 const PRIOR = 2;
 const keyOf = (team, name) => `${team}:${name.trim().toLowerCase()}`;
 const stats = () => (board().stats ||= {});
-const team = () => (board().statsTeam ||= { geschenke: 0 });
+const team = () => (board().statsTeam ||= { geschenke: 0, verloren: 0 });
 
 export function grade(v, role = v.role || 'angriff') {
   const w = WEIGHTS[role] || WEIGHTS.angriff;
@@ -114,19 +114,27 @@ export function openStats() {
       COLS.map(([c]) => h('div', { class: 'st-col' }, String(totals[c]))),
       gradeCell(grades.length ? grades.reduce((a, b) => a + b, 0) / grades.length : null));
 
-    // Geschenke: Punkte durch Fehler des Gegners (Team, ohne Spieler, nicht in der Note)
+    // Team-Zähler (ohne Spieler, nicht in der Note): Geschenke und verlorene Punkte → Spielstand
     const t = team();
     const own = (totals.angriff || 0) + (totals.block || 0) + (totals.blockout || 0);
+    const wir = own + (t.geschenke || 0);
+    const gegner = (t.verloren || 0) + (totals.fehl || 0);
+    const teamCounter = (key, title, sub) =>
+      h('div', { class: 'team-ctr' },
+        h('div', { class: 'gift-lbl' }, h('b', {}, title), h('span', { class: 'muted small' }, sub)),
+        counter(t[key], (d) => changed(() => (t[key] = Math.max(0, (t[key] || 0) + d))), title));
     const gifts = h('div', { class: 'st-gifts' },
-      h('div', { class: 'gift-lbl' }, h('b', {}, 'Geschenke'), h('span', { class: 'muted small' }, 'Punkte durch Fehler des Gegners')),
-      counter(t.geschenke, (d) => changed(() => (t.geschenke = Math.max(0, (t.geschenke || 0) + d))), 'Geschenke'),
-      h('div', { class: 'gift-sum' }, h('span', { class: 'muted small' }, 'Punkte gesamt'), h('b', {}, String(own + (t.geschenke || 0))),
-        h('span', { class: 'muted small' }, `(${own} eigene + ${t.geschenke || 0} geschenkt)`)));
+      teamCounter('geschenke', 'Geschenke', 'Punkte durch Fehler des Gegners'),
+      teamCounter('verloren', 'Punkt verloren', 'sonstige Punkte für den Gegner'),
+      h('div', { class: 'score' },
+        h('span', { class: 'muted small' }, 'Spielstand'),
+        h('div', { class: 'score-num' }, h('span', { class: 'wir' }, String(wir)), h('span', { class: 'colon' }, ':'), h('span', { class: 'geg' }, String(gegner))),
+        h('span', { class: 'muted small' }, `Wir: ${own} eigene + ${t.geschenke || 0} geschenkt · Gegner: ${t.verloren || 0} verloren + ${totals.fehl || 0} Fehlangaben`)));
     const info = h('details', { class: 'st-info' },
       h('summary', {}, 'Wie wird die Note berechnet?'),
       h('p', { class: 'small' }, 'Angreifer (A): Angriff, Block, Blockout je +1 · Abwehr +0,5 · perfektes Zuspiel +0,5 · Fehlangabe −1.'),
       h('p', { class: 'small' }, 'Zuspieler (Z): perfektes Zuspiel +1 · Angriff, Block, Blockout je +1 · Abwehr +0,75 · Fehlangabe −1.'),
-      h('p', { class: 'small' }, 'Die Summe wird durch die Zahl der Aktionen (+2 als Ausgleich bei wenigen Aktionen) geteilt und auf 1,0 (sehr gut) bis 6,0 umgerechnet. Die Team-Note ist der Durchschnitt der Spielernoten. Geschenke zählen nicht zur Note. Rolle ändern: Spieler auf dem Feld antippen → Angreifer/Zuspieler, oder hier auf A/Z tippen.'));
+      h('p', { class: 'small' }, 'Die Summe wird durch die Zahl der Aktionen (+2 als Ausgleich bei wenigen Aktionen) geteilt und auf 1,0 (sehr gut) bis 6,0 umgerechnet. Die Team-Note ist der Durchschnitt der Spielernoten. Geschenke und verlorene Punkte zählen nicht zur Note. Spielstand: Wir = Angriff + Block + Blockout + Geschenke · Gegner = Punkt verloren + Fehlangaben. Rolle ändern: Spieler auf dem Feld antippen → Angreifer/Zuspieler, oder hier auf A/Z tippen.'));
     body.replaceChildren(h('div', { class: 'st-table' }, head, ...lines, ...empty, sum), gifts, info);
   };
   render();
@@ -138,9 +146,9 @@ export function openStats() {
       {
         label: 'Zurücksetzen', danger: true,
         onClick: async () => {
-          if (await confirmDlg('Statistik zurücksetzen?', 'Alle Zähler und Geschenke dieses Boards werden auf 0 gesetzt.', { okLabel: 'Zurücksetzen', danger: true })) {
+          if (await confirmDlg('Statistik zurücksetzen?', 'Alle Zähler, Geschenke und verlorenen Punkte dieses Boards werden auf 0 gesetzt.', { okLabel: 'Zurücksetzen', danger: true })) {
             board().stats = {};
-            board().statsTeam = { geschenke: 0 };
+            board().statsTeam = { geschenke: 0, verloren: 0 };
             touch();
             emit('stats');
             render();

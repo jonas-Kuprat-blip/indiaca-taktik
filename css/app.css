@@ -347,8 +347,10 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 .grade.g4 { background: #f97316; color: #fff; } .grade.g5 { background: #dc2626; color: #fff; } .grade.g-none { color: var(--muted); }
 .st-gifts { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 10px 12px; border-radius: 14px; background: var(--panel2); border: 2px dashed var(--border); }
 .gift-lbl { display: flex; flex-direction: column; }
-.gift-sum { display: flex; align-items: baseline; gap: 6px; margin-left: auto; }
-.gift-sum b { font-size: 22px; }
+.team-ctr { display: flex; align-items: center; gap: 10px; }
+.score { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+.score-num { display: flex; align-items: baseline; gap: 6px; font-size: 34px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.score-num .wir { color: #2563eb; } .score-num .geg { color: #dc2626; } .score-num .colon { color: var(--muted); }
 .st-info summary { cursor: pointer; color: var(--muted); font-size: 13px; }
 .st-info p { margin: 6px 0 0; color: var(--muted); }
 .toast { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%) translateY(20px); z-index: 80; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .2s; }

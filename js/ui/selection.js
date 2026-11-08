@@ -68,8 +68,9 @@ export function initSelectionBar(wrap) {
       const el = findEl(id);
       if (el.type === 'zone' && el.shape === 'circle') el.r = Math.max(0.15, el.r * k);
       else if (el.points) {
-        const cx = el.points.reduce((a, p) => a + p[0], 0) / el.points.length;
-        const cy = el.points.reduce((a, p) => a + p[1], 0) / el.points.length;
+        // Blick skaliert um die Spitze, andere Formen um ihren Mittelpunkt
+        const cx = el.vee ? el.points[1][0] : el.points.reduce((a, p) => a + p[0], 0) / el.points.length;
+        const cy = el.vee ? el.points[1][1] : el.points.reduce((a, p) => a + p[1], 0) / el.points.length;
         el.points = el.points.map(([x, y]) => [Math.round((cx + (x - cx) * k) * 1000) / 1000, Math.round((cy + (y - cy) * k) * 1000) / 1000]);
       } else if (el.type === 'arrow') {
         const mx = (el.x1 + el.x2) / 2, my = (el.y1 + el.y2) / 2;
@@ -112,7 +113,14 @@ export function initSelectionBar(wrap) {
       else parts.push(h('button', { class: 'btn text small', onclick: () => commit(() => (findEl(el.id).from = { x: el.x - 2 * scale(), y: el.y })) }, '+ Pfeil'));
     } else if (el.type === 'zone') {
       const r = slider(el, 'opacity', '0.1', '0.8', '0.05', 'Deckkraft', 0.3);
-      parts.push(...sizeBtns(el), swatches(el), lbl('Deckkraft'), r, dup(el));
+      const turn = (deg) => commit(() => {
+        const z = findEl(el.id), [ax, ay] = z.points[1], c = Math.cos((deg * Math.PI) / 180), s2 = Math.sin((deg * Math.PI) / 180);
+        z.points = z.points.map(([x, y]) => [Math.round((ax + (x - ax) * c - (y - ay) * s2) * 1000) / 1000, Math.round((ay + (x - ax) * s2 + (y - ay) * c) * 1000) / 1000]);
+      });
+      const rotBtns = el.vee ? [lbl('Drehen'),
+        h('button', { class: 'btn', html: I.turnL, 'aria-label': 'Links drehen', title: 'Links drehen', onclick: () => turn(-15) }),
+        h('button', { class: 'btn', html: I.turnR, 'aria-label': 'Rechts drehen', title: 'Rechts drehen', onclick: () => turn(15) })] : [];
+      parts.push(...sizeBtns(el), ...rotBtns, swatches(el), lbl('Deckkraft'), r, dup(el));
     } else if (el.type === 'arrow') {
       parts.push(...sizeBtns(el), swatches(el),
         h('button', { class: 'btn' + (el.dashed ? ' active' : ''), html: I.dash, 'aria-label': 'Gestrichelt', onclick: () => commit(() => (findEl(el.id).dashed = !el.dashed)) }),

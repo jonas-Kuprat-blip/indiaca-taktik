@@ -19,7 +19,7 @@ async function start() {
   initAnim(wrap);
   initToolbar(document.getElementById('toolbar'));
   initPalette(document.getElementById('palette'));
-  initNotes(document.getElementById('notes'));
+  initNotes(document.getElementById('notes'), wrap);
   initPagebar(document.getElementById('pagebar'));
   store.emit('board');
   store.emit('page');

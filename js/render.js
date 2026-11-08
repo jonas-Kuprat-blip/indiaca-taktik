@@ -162,6 +162,13 @@ export function renderSelection(el, page, b) {
     case 'arrow':
       return handle('a1', el.x1, el.y1, s) + handle('a2', el.x2, el.y2, s);
     case 'zone':
+      if (el.vee) {
+        // Blick: nur ein Anfasser vorne in der Öffnung (drehen + Länge)
+        const [l, a, r] = el.points;
+        const mx = (l[0] + r[0]) / 2, my = (l[1] + r[1]) / 2;
+        return `<path class="sel" d="M${el.points.map((p) => `${f(p[0])} ${f(p[1])}`).join('L')}Z"/>` +
+          `<line class="sel" x1="${f(a[0])}" y1="${f(a[1])}" x2="${f(mx)}" y2="${f(my)}"/>` + handle('vrot', mx, my, s);
+      }
       if (el.shape === 'poly')
         return `<path class="sel" d="M${el.points.map((p) => `${f(p[0])} ${f(p[1])}`).join('L')}Z"/>` +
           el.points.map((p, i) => handle('v' + i, p[0], p[1], s)).join('');

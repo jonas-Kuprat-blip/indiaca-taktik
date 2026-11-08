@@ -570,6 +570,17 @@ function translate(el, o, dx, dy) {
 function applyHandle(g, pt) {
   const el = findEl(g.id);
   if (!el) return;
+  if (g.h === 'vrot' && el.points) {
+    // Blick um die Spitze drehen und Länge anpassen, Öffnungswinkel bleibt
+    const [l, a, r] = el.points;
+    const half = Math.abs(Math.atan2(r[1] - a[1], r[0] - a[0]) - Math.atan2(l[1] - a[1], l[0] - a[0]));
+    const sp = (half > Math.PI ? 2 * Math.PI - half : half) / 2;
+    const th = Math.atan2(pt.y - a[1], pt.x - a[0]);
+    const len = Math.max(0.4, Math.hypot(pt.x - a[0], pt.y - a[1]) / Math.cos(sp));
+    const arm = (d) => [r3(a[0] + Math.cos(th + d) * len), r3(a[1] + Math.sin(th + d) * len)];
+    el.points = [arm(-sp), a, arm(sp)];
+    return;
+  }
   if (g.h[0] === 'v' && el.points) {
     const i = +g.h.slice(1);
     if (el.points[i]) el.points[i] = [r3(pt.x), r3(pt.y)];

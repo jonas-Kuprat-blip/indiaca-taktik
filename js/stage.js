@@ -234,7 +234,9 @@ function down(e) {
       const id = elNode.dataset.id;
       Object.assign(g, { kind: 'move', id, orig: clone(findEl(id)) });
     } else {
+      // Leere Fläche: im gezoomten Zustand Feld verschieben
       g.kind = 'none';
+      g.p0 = screenToView(e.clientX, e.clientY);
     }
     return;
   }
@@ -281,6 +283,12 @@ function move(e) {
     if (g.kind === 'move') snapshot();
   }
   switch (g.kind) {
+    case 'none':
+      if (g.moved && view.k > 1.01) {
+        pinTo(g.p0, e.clientX, e.clientY);
+        svg.classList.add('panning');
+      }
+      break;
     case 'move': {
       if (!g.moved) return;
       const el = findEl(g.id);
@@ -341,7 +349,8 @@ function up(e) {
       }
       break;
     case 'none':
-      if (state.selectionId) select(null);
+      svg.classList.remove('panning');
+      if (!g.moved && state.selectionId) select(null);
       break;
     case 'stroke':
       commit((pg) =>

@@ -136,6 +136,7 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 .hd-hit { fill: transparent; }
 .eraser { fill: none; stroke: var(--muted); stroke-width: .03; stroke-dasharray: .08 .06; }
 .el { cursor: pointer; }
+#stage.panning { cursor: grabbing; }
 
 /* ---------- Auswahl-Leiste & Hinweis ---------- */
 #selbar {

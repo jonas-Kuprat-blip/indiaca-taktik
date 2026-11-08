@@ -252,11 +252,13 @@ export function switchPage(id) {
   rememberLast();
   emitPage();
 }
-export function makePage(kind, half = false) {
+export function makePage(kind, half = false, orientation = null) {
   const b = board();
   const n = b.pages.filter((p) => p.kind === kind).length + 1;
-  const p = newPage(kind, kind === 'angabe' ? `Angabe ${n}` : half ? `Hälfte ${b.pages.length + 1}` : `Seite ${b.pages.length + 1}`);
+  const base = kind === 'angabe' ? `Angabe ${n}` : half ? 'Hälfte' : orientation === 'quer' ? 'Querfeld' : 'Seite';
+  const p = newPage(kind, kind === 'angabe' ? base : `${base} ${b.pages.length + 1}`);
   if (half) p.half = true;
+  p.orientation = orientation || state.orientation;
   return p;
 }
 export function addPage(p) {
@@ -314,6 +316,15 @@ export function setServeTypes(types) {
 // Angabearten/Legende wurden entfernt – Ziele nutzen die normale Farbe.
 export function activeServeType() {
   return null;
+}
+/** Ausrichtung der aktuellen Seite: 'hoch' oder 'quer' (ohne Angabe gilt der Standard) */
+export const pageOrientation = (p = page()) => p?.orientation || state.orientation;
+export function setOrientation(o) {
+  page().orientation = o;
+  touch();
+  emit('page');
+  emit('elements');
+  emit('ui');
 }
 export function setHalf(half) {
   const p = page();

@@ -1,6 +1,6 @@
 import { NS, uid, clone, dist, segDist, r3, colorCss, clamp } from './util.js';
 import {
-  state, board, page, findEl, commit, snapshot, changed, select, on, emit, switchPage, pageIndex, scale, activeServeType, setTool,
+  state, board, page, findEl, commit, snapshot, changed, select, on, emit, switchPage, pageIndex, scale, activeServeType, setTool, pageOrientation,
 } from './store.js';
 import { defaultPos } from './model.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox } from './render.js';
@@ -53,7 +53,7 @@ function resetView() {
   view.cx = view.cy = null;
   applyView();
 }
-const rot = () => (state.orientation === 'quer' ? 0 : 90);
+const rot = () => (pageOrientation() === 'quer' ? 0 : 90);
 const gestures = new Map(); // pointerId → Geste
 
 export function initStage(wrap) {

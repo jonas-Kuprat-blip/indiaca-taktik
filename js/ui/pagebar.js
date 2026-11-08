@@ -3,7 +3,7 @@ import { I } from '../icons.js';
 import { FIELDS } from '../model.js';
 import {
   state, on, board, page, pageIndex, switchPage, addPage, makePage, copyCurrentPage, renamePage, deletePage,
-  movePage, commit, setHalf, saveTemplate, pageFromTemplate, renameTemplate, deleteTemplate,
+  movePage, commit, setHalf, setOrientation, pageOrientation, saveTemplate, pageFromTemplate, renameTemplate, deleteTemplate,
 } from '../store.js';
 import { thumbSVG } from '../render.js';
 import { menu, modal, promptText, confirmDlg, toast } from './dialogs.js';
@@ -106,6 +106,7 @@ function pageMenu(anchor) {
     { label: 'Umbenennen', icon: I.edit, onClick: async () => { const v = await promptText('Seite umbenennen', p.name); if (v) renamePage(p.id, v); } },
     { label: 'Duplizieren', icon: I.copy, onClick: copyCurrentPage },
     { label: 'Als Vorlage speichern', icon: I.star, onClick: async () => { const v = await promptText('Name der Vorlage', p.name); if (v) { await saveTemplate(v); toast('Vorlage gespeichert'); } } },
+    { label: pageOrientation(p) === 'quer' ? 'Feld hochkant stellen' : 'Feld quer kippen', icon: I.rotate, onClick: () => setOrientation(pageOrientation(p) === 'quer' ? 'hoch' : 'quer') },
     { label: p.half ? 'Ganzes Feld zeigen' : 'Nur eigene Feldhälfte', icon: I.half, onClick: () => setHalf(!p.half) },
     { label: 'Nach links', icon: I.left, disabled: i === 0, onClick: () => movePage(i, i - 1) },
     { label: 'Nach rechts', icon: I.right, disabled: i === n - 1, onClick: () => movePage(i, i + 1) },
@@ -146,7 +147,8 @@ export function newPageDialog() {
     wide: true,
     body: h('div', {},
       h('div', { class: 'big-opts' },
-        opt(I.rect, 'Leeres Feld', 'Clean Sheet', () => addPage(makePage('taktik'))),
+        opt(I.rect, 'Leeres Feld', 'Hochkant', () => addPage(makePage('taktik', false, 'hoch'))),
+        opt(I.rotate, 'Querfeld', 'Feld quer, Netz senkrecht', () => addPage(makePage('taktik', false, 'quer'))),
         opt(I.half, 'Eigene Feldhälfte', 'Nur unsere Hälfte, größer', () => addPage(makePage('taktik', true))),
         opt(I.serve, 'Angabe-Seite', 'Ziele mit Kreuzen', () => addPage(makePage('angabe'))),
         opt(I.copy, 'Kopie dieser Seite', page().name, copyCurrentPage)),

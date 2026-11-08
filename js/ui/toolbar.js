@@ -1,7 +1,7 @@
 import { h, colorCss } from '../util.js';
 import { I } from '../icons.js';
 import { COLORS, WIDTHS } from '../model.js';
-import { state, on, set, setTool, undo, redo, canUndo, canRedo, board, page, renameBoard } from '../store.js';
+import { state, on, set, setTool, undo, redo, canUndo, canRedo, board, page, renameBoard, pageOrientation, setOrientation } from '../store.js';
 import { promptText, colorPicker } from './dialogs.js';
 import { openBoardManager } from './boards.js';
 
@@ -56,7 +56,7 @@ export function initToolbar(root) {
   const undoBtn = btn(I.undo, 'Rückgängig', undo);
   const redoBtn = btn(I.redo, 'Wiederholen', redo);
   const notesBtn = btn(I.notes, 'Notizen', () => set({ notesOpen: !state.notesOpen }));
-  const rotBtn = btn(I.rotate, 'Feld drehen (hoch/quer)', () => set({ orientation: state.orientation === 'quer' ? 'hoch' : 'quer' }));
+  const rotBtn = btn(I.rotate, 'Feld kippen (hoch/quer)', () => setOrientation(pageOrientation() === 'quer' ? 'hoch' : 'quer'));
   const themeBtn = btn(I.theme, 'Theme', () => set({ theme: THEMES[(THEMES.indexOf(state.theme) + 1) % 3] }));
 
   const widthGroup = h('div', { class: 'group' }, widthBtns, dashBtn);
@@ -88,7 +88,7 @@ export function initToolbar(root) {
     notesBtn.classList.toggle('active', state.notesOpen);
     notesBtn.classList.toggle('has-dot', !!page()?.notes?.trim());
     themeBtn.title = THEME_LABEL[state.theme];
-    rotBtn.title = state.orientation === 'quer' ? 'Feld ist quer – tippen für Hochformat' : 'Feld ist hochkant – tippen für Querformat';
+    rotBtn.title = pageOrientation() === 'quer' ? 'Feld ist quer – tippen zum Hochkant-Kippen' : 'Feld ist hochkant – tippen zum Quer-Kippen';
     if (state.theme === 'auto') delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = state.theme;
     document.getElementById('app').classList.toggle('notes-open', state.notesOpen);

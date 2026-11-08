@@ -315,10 +315,10 @@ function down(e) {
   }
 
   const pt = toW(inv(), e.clientX, e.clientY);
-  const locked = editLock();
-  const handleNode = locked ? null : e.target.closest?.('[data-handle]');
-  const elNode = locked ? null : e.target.closest?.('#g-els [data-id]');
-  let tool = palmMode || locked ? 'select' : state.tool;
+  const editLocked = editLock(); // Animation läuft → nur Ansicht bewegen
+  const handleNode = editLocked ? null : e.target.closest?.('[data-handle]');
+  const elNode = editLocked ? null : e.target.closest?.('#g-els [data-id]');
+  let tool = palmMode || editLocked ? 'select' : state.tool;
   // Einmal-Werkzeuge: Tippen auf ein vorhandenes Element verschiebt es, statt etwas Neues zu setzen
   if (elNode && ONE_SHOT.includes(tool)) {
     tool = 'select';

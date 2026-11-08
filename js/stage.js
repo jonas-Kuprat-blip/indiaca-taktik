@@ -173,7 +173,7 @@ function drawField() {
   drawnKey = k;
   svg.setAttribute('viewBox', viewBox(b.fieldType, page().half, rot()));
   gWorld.setAttribute('transform', worldTransform(rot()));
-  gField.innerHTML = renderField(b, rot());
+  gField.innerHTML = renderField(b, page().half);
   // Alles außerhalb des Feldbereichs (z. B. gegnerische Hälfte) abschneiden
   const mb = modelBox(b.fieldType, page().half);
   const cr = svg.querySelector('#vclip-r');

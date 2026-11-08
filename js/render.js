@@ -18,13 +18,13 @@ export function viewBox(ft, half = false, rot = 0) {
 export const worldTransform = (rot) => (rot ? 'rotate(-90)' : '');
 
 // ---------- Feld ----------
-export function renderField(b, rot = 0) {
+export function renderField(b, half = false) {
   const F = FIELDS[b.fieldType];
   const L = F.length, W = F.width, a = F.attack, m = F.margin;
   const x0 = -L / 2 - m, y0 = -W / 2 - m;
   return `<rect class="f-out" x="${x0}" y="${y0}" width="${L + 2 * m}" height="${W + 2 * m}"/>
   <rect class="f-court" x="${-L / 2}" y="${-W / 2}" width="${L}" height="${W}"/>
-  ${logoMark(F, rot)}
+  ${logoMark(F, half)}
   ${['f-edge', 'f-line'].map((c) => `
   <line class="${c}" x1="${-a}" y1="${-W / 2}" x2="${-a}" y2="${W / 2}"/>
   <line class="${c}" x1="${a}" y1="${-W / 2}" x2="${a}" y2="${W / 2}"/>
@@ -34,10 +34,15 @@ export function renderField(b, rot = 0) {
   <circle class="f-post" cx="0" cy="${W / 2 + 0.45}" r="0.1"/>`;
 }
 
-/** Vereinslogo leicht transparent auf der eigenen Feldhälfte, immer aufrecht lesbar */
-function logoMark(F, rot) {
-  const w = Math.min(F.width * 0.85, F.length / 2 * 0.8), hgt = w / 1.95;
-  return `<image class="f-logo" href="img/logo.jpg" x="${f(-w / 2)}" y="${f(-hgt / 2)}" width="${f(w)}" height="${f(hgt)}" preserveAspectRatio="xMidYMid meet" transform="translate(${f(-F.length / 4)} 0)${rot ? ` rotate(${rot})` : ''}"/>`;
+/** Vereinslogo großflächig und leicht transparent, längs am Feld ausgerichtet (dreht mit dem Feld).
+ *  Halbfeld-Seiten: über die eigene Hälfte, sonst über das ganze Feld. */
+function logoMark(F, half) {
+  const AR = 1.95; // Seitenverhältnis des Logos
+  const availL = half ? F.length / 2 : F.length, availW = F.width;
+  let w = availL * 0.92, hgt = w / AR;
+  if (hgt > availW * 0.92) { hgt = availW * 0.92; w = hgt * AR; }
+  const cx = half ? -F.length / 4 : 0;
+  return `<image class="f-logo" href="img/logo.jpg" x="${f(cx - w / 2)}" y="${f(-hgt / 2)}" width="${f(w)}" height="${f(hgt)}" preserveAspectRatio="xMidYMid meet"/>`;
 }
 
 // ---------- Elemente ----------
@@ -184,5 +189,5 @@ export function renderSelection(el, page, b) {
 }
 
 export function thumbSVG(page, b) {
-  return `<svg viewBox="${viewBox(b.fieldType, page.half)}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${renderField(b)}${renderElements(page, b)}</svg>`;
+  return `<svg viewBox="${viewBox(b.fieldType, page.half)}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${renderField(b, page.half)}${renderElements(page, b)}</svg>`;
 }

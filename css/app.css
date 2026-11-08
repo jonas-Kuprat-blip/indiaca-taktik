@@ -180,14 +180,16 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
   background: repeating-linear-gradient(transparent 0 27px, rgba(80, 120, 200, .28) 27px 28px); background-attachment: local;
 }
 .notes-ta::placeholder { color: rgba(60, 45, 10, .45); }
-#notes-tab {
-  position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 5; border: 0; cursor: pointer;
+#notes-tab, #stats-tab {
+  position: absolute; right: 0; top: 36%; transform: translateY(-50%); z-index: 5; border: 0; cursor: pointer;
   width: 40px; padding: 12px 0; border-radius: 12px 0 0 12px; background: #fff3a6; color: #5a4a0e;
   display: flex; flex-direction: column; align-items: center; gap: 8px; box-shadow: -2px 3px 10px rgba(0, 0, 0, .3);
   touch-action: manipulation;
 }
-#notes-tab .ic svg { width: 22px; height: 22px; display: block; }
-#notes-tab .tx { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: 700; font-size: 13px; letter-spacing: .04em; }
+#stats-tab { top: 64%; background: #dbeafe; color: #1e3a8a; }
+#app.notes-open #stats-tab { opacity: 0; pointer-events: none; }
+#stats-tab .ic svg, #notes-tab .ic svg { width: 22px; height: 22px; display: block; }
+#notes-tab .tx, #stats-tab .tx { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: 700; font-size: 13px; letter-spacing: .04em; }
 #notes-tab.has-notes::after { content: ""; position: absolute; top: 6px; left: 6px; width: 8px; height: 8px; border-radius: 50%; background: #ea580c; }
 #app.notes-open #notes-tab { opacity: 0; pointer-events: none; }
 #stage-wrap.anim #notes { bottom: 136px; }
@@ -257,6 +259,8 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 #zoombar .reset-btn { opacity: .45; }
 #zoombar.zoomed .reset-btn { opacity: 1; color: var(--accent); }
 #zoombar .btn.active { background: var(--accent); color: #fff; }
+#zoombar .lock-btn.active { background: #f59e0b; color: #111; }
+#zoombar.locked .btn:not(.lock-btn) { opacity: .3; }
 #club-logo {
   position: absolute; top: 10px; right: 10px; z-index: 3; width: 150px; height: auto;
   border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, .35); pointer-events: none; user-select: none;

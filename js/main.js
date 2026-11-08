@@ -6,6 +6,7 @@ import { initPagebar } from './ui/pagebar.js';
 import { initNotes } from './ui/notes.js';
 import { initSelectionBar } from './ui/selection.js';
 import { initAnim } from './anim.js';
+import { initStatsTab } from './ui/stats.js';
 
 // iOS: Pinch-Zoom & Doppeltipp-Zoom der Seite unterbinden
 document.addEventListener('gesturestart', (e) => e.preventDefault());
@@ -20,6 +21,7 @@ async function start() {
   initToolbar(document.getElementById('toolbar'));
   initPalette(document.getElementById('palette'));
   initNotes(document.getElementById('notes'), wrap);
+  initStatsTab(wrap);
   initPagebar(document.getElementById('pagebar'));
   store.emit('board');
   store.emit('page');

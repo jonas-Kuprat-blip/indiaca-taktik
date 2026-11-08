@@ -43,7 +43,8 @@ export function openStats() {
     const list = rows();
     if (!list.length) {
       body.replaceChildren(
-        h('p', { class: 'muted' }, 'Noch keine benannten Spieler auf dieser Seite.'),
+        h('div', { class: 'st-row st-head' }, h('div', { class: 'st-name' }, 'Spieler'), COLS.map(([, label]) => h('div', { class: 'st-col' }, label))),
+        h('p', { class: 'muted', style: { padding: '12px 6px 0' } }, 'Noch keine benannten Spieler – die Liste ist leer.'),
         h('p', { class: 'muted small' }, 'So geht’s: Spieler auf dem Feld antippen → oben in der Leiste einen Namen eingeben. Danach erscheint er hier.')
       );
       return;
@@ -95,4 +96,11 @@ export function openStats() {
       { label: 'Fertig', primary: true },
     ],
   });
+}
+
+/** Lasche „Statistik“ am rechten Feldrand (unter den Notizen) – immer erreichbar */
+export function initStatsTab(wrap) {
+  const tab = h('button', { id: 'stats-tab', 'aria-label': 'Statistik öffnen', title: 'Statistik', onclick: openStats },
+    h('span', { class: 'ic', html: I.stats }), h('span', { class: 'tx' }, 'Statistik'));
+  wrap.append(tab);
 }

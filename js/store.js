@@ -21,6 +21,7 @@ export const state = {
   // Ansicht
   notesOpen: false,
   theme: 'auto',
+  viewLocked: false, // Ansicht eingefroren (kein Zoom/Verschieben/Drehen)
   orientation: 'hoch', // hoch = Netz waagerecht, eigene Hälfte unten | quer
 };
 
@@ -121,7 +122,7 @@ export function touch(b = board()) {
 }
 export const flushNow = () => flush();
 
-const PREF_KEYS = ['color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme', 'orientation'];
+const PREF_KEYS = ['color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme', 'orientation', 'viewLocked'];
 const savePrefs = debounce(() => {
   const p = {};
   PREF_KEYS.forEach((k) => (p[k] = state[k]));

@@ -98,7 +98,7 @@ export function renderOne(el, page, b, rot = 0) {
       const k = el.size || 1;
       const R = 0.45 * s * k;
       return `<g class="el pl" data-id="${el.id}" transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}">
-        <circle r="${f(R)}" class="pl-hit"/>${playerIcon(el.color, s * k)}
+        <circle r="${f(R)}" class="pl-hit"/>${el.rot ? `<g transform="rotate(${f(el.rot)})">${playerIcon(el.color, s * k)}</g>` : playerIcon(el.color, s * k)}
         ${el.label ? `<text class="lbl" y="${f(R + 0.28 * s)}" font-size="${f(0.32 * s)}" text-anchor="middle" dominant-baseline="central">${esc(el.label)}</text>` : ''}
       </g>`;
     }

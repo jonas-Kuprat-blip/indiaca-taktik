@@ -1,6 +1,7 @@
 import { NS, uid, clone, dist, segDist, r3, colorCss } from './util.js';
+const locked = () => state.viewLocked;
 import {
-  state, board, page, findEl, commit, snapshot, changed, select, on, emit, switchPage, pageIndex, scale, activeServeType, setTool, pageOrientation,
+  state, board, page, findEl, commit, snapshot, changed, select, on, emit, set, switchPage, pageIndex, scale, activeServeType, setTool, pageOrientation,
 } from './store.js';
 import { defaultPos, clampPlayer } from './model.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox } from './render.js';
@@ -113,7 +114,22 @@ export function initStage(wrap) {
   });
   const resetBtn = zb('Ansicht zurücksetzen (gerade, 100 %)', I.reset, resetView);
   resetBtn.classList.add('reset-btn');
+  const lockBtn = zb('Ansicht sperren', I.unlock, () => set({ viewLocked: !state.viewLocked }));
+  lockBtn.classList.add('lock-btn');
+  const syncLock = () => {
+    lockBtn.innerHTML = state.viewLocked ? I.lock : I.unlock;
+    lockBtn.title = state.viewLocked ? 'Ansicht ist gesperrt – tippen zum Entsperren' : 'Ansicht sperren (Zoom/Verschieben/Drehen einfrieren)';
+    lockBtn.classList.toggle('active', state.viewLocked);
+    zoombar.classList.toggle('locked', state.viewLocked);
+    [...zoombar.querySelectorAll('button')].forEach((b) => b !== lockBtn && (b.disabled = state.viewLocked));
+    if (state.viewLocked) {
+      rotpanel?.classList.remove('show');
+      rotBtn.classList.remove('active');
+    }
+  };
+  on('ui', syncLock);
   zoombar.append(
+    lockBtn,
     rotBtn,
     resetBtn,
     zb('Vergrößern', I.plus, () => zoomAt(viewCenter(), 1.4)),
@@ -150,6 +166,7 @@ export function initStage(wrap) {
   // Mac: Trackpad-Pinch/Mausrad = Zoom (Drehen nur über den Regler)
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
+    if (locked()) return;
     zoomAt(screenToView(e.clientX, e.clientY), Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)));
   }, { passive: false });
 
@@ -280,6 +297,8 @@ function down(e) {
   // Zweiter Finger → Kamera-Geste (Pinch-Zoom + Drehen + Verschieben)
   if (e.pointerType === 'touch') {
     const others = [...gestures.entries()].filter(([, g]) => g.ptype === 'touch' && g.kind !== 'cam2');
+    // Ansicht gesperrt: zweiter Finger wird ignoriert (kein Zoom/Verschieben)
+    if (locked() && others.length >= 1) return;
     if (others.length === 1 && (!others[0][1].moved || others[0][1].kind === 'none' || others[0][1].kind === 'pan')) {
       const [oid, og] = others[0];
       abort(oid, og);
@@ -378,7 +397,7 @@ function move(e) {
   }
   switch (g.kind) {
     case 'none': {
-      if (!g.moved) return;
+      if (!g.moved || locked()) return;
       const q = screenToView(e.clientX, e.clientY);
       Object.assign(cam, { ...g.cam0, bx: g.cam0.bx + q.x - g.v0.x, by: g.cam0.by + q.y - g.v0.y });
       applyCam();

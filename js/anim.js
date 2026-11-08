@@ -133,6 +133,11 @@ function lerpEl(A, B, u) {
   const L = (p, q) => p + (q - p) * u;
   for (const k of NUM) if (typeof A[k] === 'number' && typeof B[k] === 'number') o[k] = L(A[k], B[k]);
   if (A.type === 'player' || A.type === 'marker') o.size = L(A.size || 1, B.size || 1);
+  if (A.type === 'player') {
+    // kürzester Drehweg
+    const ra = A.rot || 0, d = ((((B.rot || 0) - ra + 180) % 360) + 360) % 360 - 180;
+    o.rot = ra + d * u;
+  }
   if (A.points && B.points && A.points.length === B.points.length) o.points = A.points.map((p, i) => [L(p[0], B.points[i][0]), L(p[1], B.points[i][1])]);
   if (A.from && B.from) o.from = { x: L(A.from.x, B.from.x), y: L(A.from.y, B.from.y) };
   return o;

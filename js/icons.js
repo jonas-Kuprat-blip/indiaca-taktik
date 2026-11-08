@@ -30,6 +30,8 @@ export const I = {
   turnL: svg('<path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v4.5h4.5"/>'),
   turnR: svg('<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4.5h-4.5"/>'),
   stats: svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+  lock: svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
+  unlock: svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>'),
   circle: svg('<circle cx="12" cy="12" r="8.5"/>'),
   free: svg('<path d="M6 7.5C8.5 3.5 18 3 19.5 8s-2.5 9.5-7 10.5S3 18 3.5 14 4.8 9.5 6 7.5z"/>'),
   dot: svg('<circle cx="12" cy="12" r="5" fill="currentColor"/>'),

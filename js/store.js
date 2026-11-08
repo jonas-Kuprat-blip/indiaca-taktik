@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { newBoard, newPage, FIELDS, TEAM_DEFAULT, SERVE_TYPES } from './model.js';
+import { newBoard, newPage, FIELDS, TEAM_DEFAULT, migrateElement } from './model.js';
 import { uid, clone, debounce } from './util.js';
 
 export const state = {
@@ -149,7 +149,8 @@ export async function init() {
     db.getMeta('prefs'),
   ]);
   state.boards = boards.map(normalizeBoard);
-  state.templates = templates;
+  state.templates = templates.filter((t) => t?.page);
+  state.templates.forEach((t) => normalizePage(t.page));
   if (prefs) PREF_KEYS.forEach((k) => k in prefs && (state[k] = prefs[k]));
   if (!state.boards.length) {
     const b = newBoard('Mein Board');
@@ -179,7 +180,10 @@ function normalizePage(p) {
   p.name ||= 'Seite';
   p.notes ||= '';
   if (!Array.isArray(p.elements)) p.elements = [];
-  p.elements.forEach((e) => (e.id ||= uid()));
+  p.elements.forEach((e) => {
+    e.id ||= uid();
+    migrateElement(e);
+  });
   return p;
 }
 

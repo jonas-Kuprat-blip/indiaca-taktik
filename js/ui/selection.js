@@ -60,7 +60,7 @@ export function initSelectionBar(wrap) {
     }
     const parts = [];
     if (el.type === 'player') {
-      parts.push(lbl('Nr.'), textInput(el, 'number', '#', 2), textInput(el, 'label', 'Name', 9), swatches(el), dup(el));
+      parts.push(textInput(el, 'label', 'Name (optional)', 12), swatches(el), dup(el));
     } else if (el.type === 'marker') {
       const p = page();
       parts.push(
@@ -95,8 +95,8 @@ export function initSelectionBar(wrap) {
     let t = '';
     if (!state.selectionId) {
       if (state.tool === 'marker') t = 'Tippen: Ziel setzen · Ziehen: Ziel mit Pfeil vom Startpunkt';
-      else if (['rect', 'circle', 'free'].includes(state.tool)) t = 'Ziehen, um eine Zone aufzuziehen';
-      else if (state.tool === 'select') t = 'Antippen: auswählen · Ziehen: verschieben';
+      else if (['rect', 'tri', 'circle', 'free'].includes(state.tool)) t = 'Ziehen, um die Form aufzuziehen';
+      else if (state.tool === 'select') t = 'Antippen: auswählen · Ziehen: verschieben · 2 Finger: zoomen & drehen';
       else if (p.kind === 'angabe' && state.tool !== 'eraser') t = '';
     }
     hint.textContent = t;

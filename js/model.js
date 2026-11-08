@@ -29,6 +29,17 @@ export function newPage(kind = 'taktik', name = 'Seite') {
   return p;
 }
 
+/** Alte Datenformate auf das aktuelle bringen (z. B. Rechteck-Zonen → Polygon mit 4 Ecken) */
+export function migrateElement(e) {
+  if (e.type === 'zone' && e.shape === 'rect' && 'w' in e) {
+    const { x, y, w, h } = e;
+    e.shape = 'poly';
+    e.points = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+    delete e.x; delete e.y; delete e.w; delete e.h;
+  }
+  return e;
+}
+
 export function newBoard(name = 'Neues Board', fieldType = 'indiaca') {
   const now = Date.now();
   return {

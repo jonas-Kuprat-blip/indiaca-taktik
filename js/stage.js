@@ -1,4 +1,4 @@
-import { NS, uid, clone, dist, segDist, r3, colorCss, clamp } from './util.js';
+import { NS, uid, clone, dist, segDist, r3, colorCss } from './util.js';
 import {
   state, board, page, findEl, commit, snapshot, changed, select, on, emit, switchPage, pageIndex, scale, activeServeType, setTool, pageOrientation,
 } from './store.js';
@@ -7,60 +7,87 @@ import { renderField, renderElements, renderSelection, renderOne, viewBox, world
 import { strokePath } from './stroke.js';
 import { I } from './icons.js';
 
-function overTrash(cx, cy) {
-  const r = trash.getBoundingClientRect();
-  const pad = 12;
-  return cx >= r.left - pad && cx <= r.right + pad && cy >= r.top - pad && cy <= r.bottom + pad;
-}
+/*
+ * Aufbau der Bühne:
+ *   <svg viewBox=…>            feste Basis-Ansicht des Feldes
+ *     <g #g-cam>               Kamera: Zoom + Drehung + Verschiebung (Ähnlichkeitsabbildung)
+ *       <g #g-world>           Ausrichtung hoch/quer, Koordinaten = Meter ab Feldmitte
+ *         Feld, Elemente, Live-Zeichnung, Auswahl
+ * Alle Eingaben werden über gWorld.getScreenCTM() zurückgerechnet – dadurch zeichnet der Stift
+ * auch gezoomt/gedreht exakt an der richtigen Stelle, und alles bewegt sich gemeinsam mit dem Feld.
+ */
 
-let svg, gWorld, gField, gEls, gLive, gSel, trash;
+let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar;
 let drawnKey = '';
-let zoombar;
-// ---------- Zoom (Ansicht) ----------
-const view = { k: 1, cx: null, cy: null, base: [0, 0, 1, 1] };
-const ZMAX = 5;
-function applyView() {
-  const [x, y, w, h] = view.base;
-  const w2 = w / view.k, h2 = h / view.k;
-  view.cx = clamp(view.cx ?? x + w / 2, x + w2 / 2, x + w - w2 / 2);
-  view.cy = clamp(view.cy ?? y + h / 2, y + h2 / 2, y + h - h2 / 2);
-  svg.setAttribute('viewBox', `${view.cx - w2 / 2} ${view.cy - h2 / 2} ${w2} ${h2}`);
-  zoombar?.classList.toggle('zoomed', view.k > 1.01);
+const gestures = new Map(); // pointerId → Geste
+const rot = () => (pageOrientation() === 'quer' ? 0 : 90);
+const ONE_SHOT = ['marker', 'arrow', 'rect', 'tri', 'circle', 'free'];
+
+// ---------- Kamera (komplexe Zahl m = Zoom·e^(i·Winkel), b = Verschiebung) ----------
+const cam = { mr: 1, mi: 0, bx: 0, by: 0 };
+const K_MIN = 0.5, K_MAX = 6;
+const camK = () => Math.hypot(cam.mr, cam.mi);
+const camAngle = () => Math.atan2(cam.mi, cam.mr);
+const isIdentity = (c = cam) => Math.abs(c.mr - 1) < 0.01 && Math.abs(c.mi) < 0.01 && Math.abs(c.bx) < 0.01 && Math.abs(c.by) < 0.01;
+
+function applyCam() {
+  gCam.setAttribute('transform', `matrix(${cam.mr} ${cam.mi} ${-cam.mi} ${cam.mr} ${cam.bx} ${cam.by})`);
+  zoombar?.classList.toggle('zoomed', !isIdentity());
+}
+/** Ähnlichkeitsabbildung S(z) = M·z + B auf die Kamera anwenden (C ← S ∘ C) */
+function composeCam(Mr, Mi, Bx, By, base = cam) {
+  const mr = Mr * base.mr - Mi * base.mi;
+  const mi = Mr * base.mi + Mi * base.mr;
+  const bx = Mr * base.bx - Mi * base.by + Bx;
+  const by = Mr * base.by + Mi * base.bx + By;
+  Object.assign(cam, { mr, mi, bx, by });
+}
+/** Zoom/Drehung um einen festen Ansichtspunkt p */
+function transformAbout(p, Mr, Mi, base = cam) {
+  // B = p − M·p
+  composeCam(Mr, Mi, p.x - (Mr * p.x - Mi * p.y), p.y - (Mr * p.y + Mi * p.x), base);
+}
+function clampZoomAbout(p) {
+  const k = camK();
+  const kc = Math.min(K_MAX, Math.max(K_MIN, k));
+  if (kc !== k) transformAbout(p, kc / k, 0);
 }
 function screenToView(cx, cy) {
-  const p = new DOMPoint(cx, cy).matrixTransform(svg.getScreenCTM().inverse());
-  return { x: p.x, y: p.y };
+  const q = new DOMPoint(cx, cy).matrixTransform(svg.getScreenCTM().inverse());
+  return { x: q.x, y: q.y };
 }
-/** Ansichtspunkt p0 (View-Koordinaten) unter den Bildschirmpunkt (sx, sy) legen */
-function pinTo(p0, sx, sy) {
-  applyView();
-  const pm = screenToView(sx, sy);
-  view.cx += p0.x - pm.x;
-  view.cy += p0.y - pm.y;
-  applyView();
-}
-function zoomAt(sx, sy, factor) {
-  const p0 = screenToView(sx, sy);
-  view.k = clamp(view.k * factor, 1, ZMAX);
-  pinTo(p0, sx, sy);
-}
-function zoomCenter(factor) {
+function viewCenter() {
   const r = svg.getBoundingClientRect();
-  zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor);
+  return screenToView(r.left + r.width / 2, r.top + r.height / 2);
 }
-function resetView() {
-  view.k = 1;
-  view.cx = view.cy = null;
-  applyView();
+function zoomAt(p, factor) {
+  transformAbout(p, factor, 0);
+  clampZoomAbout(p);
+  applyCam();
 }
-const rot = () => (pageOrientation() === 'quer' ? 0 : 90);
-const gestures = new Map(); // pointerId → Geste
+function rotateAbout(p, rad) {
+  transformAbout(p, Math.cos(rad), Math.sin(rad));
+  applyCam();
+}
+export function resetView() {
+  Object.assign(cam, { mr: 1, mi: 0, bx: 0, by: 0 });
+  applyCam();
+}
+/** Am Ende einer Drehgeste auf 0°/90°/180°/270° einrasten, wenn nah dran */
+function snapRotation(p) {
+  const a = camAngle();
+  const t = Math.round(a / (Math.PI / 2)) * (Math.PI / 2);
+  if (Math.abs(a - t) < (6 * Math.PI) / 180) rotateAbout(p, t - a);
+}
 
+// ---------- Aufbau ----------
 export function initStage(wrap) {
   svg = document.createElementNS(NS, 'svg');
   svg.id = 'stage';
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-  svg.innerHTML = '<defs><clipPath id="vclip"><rect id="vclip-r"/></clipPath></defs><g id="g-world" clip-path="url(#vclip)"><g id="g-field"></g><g id="g-els"></g><g id="g-live"></g><g id="g-sel"></g></g>';
+  svg.innerHTML =
+    '<defs><clipPath id="vclip"><rect id="vclip-r"/></clipPath></defs>' +
+    '<g id="g-cam"><g id="g-world" clip-path="url(#vclip)"><g id="g-field"></g><g id="g-els"></g><g id="g-live"></g><g id="g-sel"></g></g></g>';
   trash = document.createElement('div');
   trash.id = 'trash';
   trash.setAttribute('aria-label', 'Zum Löschen hierher ziehen');
@@ -77,24 +104,27 @@ export function initStage(wrap) {
     return b;
   };
   zoombar.append(
-    zb('Vergrößern', I.plus, () => zoomCenter(1.4)),
-    zb('Verkleinern', I.minus, () => zoomCenter(1 / 1.4)),
-    zb('Ganzes Feld zeigen', I.fit, resetView)
+    zb('Vergrößern', I.plus, () => zoomAt(viewCenter(), 1.4)),
+    zb('Verkleinern', I.minus, () => zoomAt(viewCenter(), 1 / 1.4)),
+    zb('Ansicht zurücksetzen (100 %, 0°)', I.fit, resetView)
   );
   wrap.append(svg, trash, zoombar);
-  // Trackpad-Pinch / Mausrad (Mac)
+  [gCam, gWorld, gField, gEls, gLive, gSel] = ['#g-cam', '#g-world', '#g-field', '#g-els', '#g-live', '#g-sel'].map((s) => svg.querySelector(s));
+
+  // Mac: Trackpad-Pinch/Mausrad = Zoom, mit Shift = Drehen
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
-    zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)));
+    const p = screenToView(e.clientX, e.clientY);
+    if (e.shiftKey) rotateAbout(p, (e.deltaY || e.deltaX) * 0.004);
+    else zoomAt(p, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)));
   }, { passive: false });
-  [gWorld, gField, gEls, gLive, gSel] = ['#g-world', '#g-field', '#g-els', '#g-live', '#g-sel'].map((s) => svg.querySelector(s));
 
   svg.addEventListener('pointerdown', down);
   svg.addEventListener('pointermove', move);
   svg.addEventListener('pointerup', up);
   svg.addEventListener('pointercancel', cancel);
   svg.addEventListener('contextmenu', (e) => e.preventDefault());
-  // iOS: keine Scroll-/Zoom-Gesten auf der Bühne
+  // iOS: keine Scroll-/Zoom-Gesten der Webseite selbst
   wrap.addEventListener('touchstart', (e) => e.target.closest('#stage') && e.preventDefault(), { passive: false });
   wrap.addEventListener('touchmove', (e) => e.target.closest('#stage') && e.preventDefault(), { passive: false });
 
@@ -112,17 +142,12 @@ const key = () => `${board().fieldType}|${!!page().half}|${rot()}|${page().id}`;
 function drawField() {
   const b = board();
   const k = key();
-  view.base = viewBox(b.fieldType, page().half, rot()).split(' ').map(Number);
-  if (k !== drawnKey) {
-    // Neue Seite / anderes Feld → Zoom zurücksetzen
-    view.k = 1;
-    view.cx = view.cy = null;
-  }
+  if (k !== drawnKey) resetView(); // neue Seite / anderes Feld → Ansicht zurücksetzen
   drawnKey = k;
-  applyView();
+  svg.setAttribute('viewBox', viewBox(b.fieldType, page().half, rot()));
   gWorld.setAttribute('transform', worldTransform(rot()));
-  gField.innerHTML = renderField(b, rot());
-  // Alles außerhalb des Sichtbereichs (z. B. gegnerische Hälfte) abschneiden
+  gField.innerHTML = renderField(b);
+  // Alles außerhalb des Feldbereichs (z. B. gegnerische Hälfte) abschneiden
   const mb = modelBox(b.fieldType, page().half);
   const cr = svg.querySelector('#vclip-r');
   cr.setAttribute('x', mb.x0);
@@ -150,6 +175,11 @@ function toW(m, cx, cy) {
 export function isOverStage(cx, cy) {
   const r = svg.getBoundingClientRect();
   return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
+}
+function overTrash(cx, cy) {
+  const r = trash.getBoundingClientRect();
+  const pad = 12;
+  return cx >= r.left - pad && cx <= r.right + pad && cy >= r.top - pad && cy <= r.bottom + pad;
 }
 
 // ---------- Spieler hinzufügen ----------
@@ -191,20 +221,17 @@ function down(e) {
   if (palmMode && [...gestures.values()].some((g) => g.ptype === 'pen')) return; // Stift aktiv → Finger ignorieren
   e.preventDefault();
 
-  // Zwei-Finger-Wisch zum Seitenwechsel
+  // Zweiter Finger → Kamera-Geste (Pinch-Zoom + Drehen + Verschieben)
   if (e.pointerType === 'touch') {
-    const others = [...gestures.entries()].filter(([, g]) => g.ptype === 'touch' && g.kind !== 'swipe');
-    if (others.length === 1 && performance.now() - others[0][1].t0 < 400 && !others[0][1].moved) {
+    const others = [...gestures.entries()].filter(([, g]) => g.ptype === 'touch' && g.kind !== 'cam2');
+    if (others.length === 1 && (!others[0][1].moved || others[0][1].kind === 'none' || others[0][1].kind === 'pan')) {
       const [oid, og] = others[0];
       abort(oid, og);
-      const g = { kind: 'swipe', ptype: 'touch', ids: [oid, e.pointerId], start: {}, pos: {} };
+      const g = { kind: 'cam2', ptype: 'touch', ids: [oid, e.pointerId], start: {}, pos: {} };
       g.start[oid] = g.pos[oid] = { x: og.cx0, y: og.cy0 };
       g.start[e.pointerId] = g.pos[e.pointerId] = { x: e.clientX, y: e.clientY };
-      const a = g.start[oid], c = g.start[e.pointerId];
-      g.d0 = Math.hypot(a.x - c.x, a.y - c.y) || 1;
-      g.k0 = view.k;
-      g.c0 = { cx: view.cx, cy: view.cy };
-      g.p0 = screenToView((a.x + c.x) / 2, (a.y + c.y) / 2);
+      g.v0 = g.ids.map((i) => screenToView(g.start[i].x, g.start[i].y));
+      g.cam0 = { ...cam };
       gestures.set(oid, g);
       gestures.set(e.pointerId, g);
       capture(e);
@@ -216,8 +243,8 @@ function down(e) {
   const handleNode = e.target.closest?.('[data-handle]');
   const elNode = e.target.closest?.('#g-els [data-id]');
   let tool = palmMode ? 'select' : state.tool;
-  // Zielmarker/Zonen/Pfeil: Tippen auf ein vorhandenes Element verschiebt es statt etwas Neues zu setzen
-  if (elNode && ['marker', 'arrow', 'rect', 'circle', 'free'].includes(tool)) {
+  // Einmal-Werkzeuge: Tippen auf ein vorhandenes Element verschiebt es, statt etwas Neues zu setzen
+  if (elNode && ONE_SHOT.includes(tool)) {
     tool = 'select';
     setTool('select');
   }
@@ -234,9 +261,8 @@ function down(e) {
       const id = elNode.dataset.id;
       Object.assign(g, { kind: 'move', id, orig: clone(findEl(id)) });
     } else {
-      // Leere Fläche: im gezoomten Zustand Feld verschieben
-      g.kind = 'none';
-      g.p0 = screenToView(e.clientX, e.clientY);
+      // Leere Fläche: Feld verschieben
+      Object.assign(g, { kind: 'none', v0: screenToView(e.clientX, e.clientY), cam0: { ...cam } });
     }
     return;
   }
@@ -253,9 +279,10 @@ function down(e) {
       eraseAt(g, pt);
       break;
     case 'rect':
+    case 'tri':
     case 'circle':
     case 'free':
-      Object.assign(g, { kind: 'zone', shape: tool, end: pt, points: [[pt.x, pt.y]] });
+      Object.assign(g, { kind: 'zone', shape: tool, end: pt, cx1: e.clientX, cy1: e.clientY, points: [[pt.x, pt.y]] });
       break;
     case 'marker':
       Object.assign(g, { kind: 'marker', end: pt });
@@ -269,11 +296,20 @@ function down(e) {
 function move(e) {
   const g = gestures.get(e.pointerId);
   if (!g) return;
-  if (g.kind === 'swipe') {
+  if (g.kind === 'cam2') {
     g.pos[e.pointerId] = { x: e.clientX, y: e.clientY };
-    const [a, c] = g.ids.map((i) => g.pos[i]);
-    view.k = clamp(g.k0 * (Math.hypot(a.x - c.x, a.y - c.y) / g.d0), 1, ZMAX);
-    pinTo(g.p0, (a.x + c.x) / 2, (a.y + c.y) / 2);
+    const [p1, p2] = g.v0;
+    const [q1, q2] = g.ids.map((i) => screenToView(g.pos[i].x, g.pos[i].y));
+    // M = (q2 − q1) / (p2 − p1) als komplexe Division
+    const ax = p2.x - p1.x, ay = p2.y - p1.y, bx = q2.x - q1.x, by = q2.y - q1.y;
+    const den = ax * ax + ay * ay || 1e-9;
+    const Mr = (bx * ax + by * ay) / den, Mi = (by * ax - bx * ay) / den;
+    // Mittelpunkt der Finger bleibt unter den Fingern
+    const pm = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }, qm = { x: (q1.x + q2.x) / 2, y: (q1.y + q2.y) / 2 };
+    composeCam(Mr, Mi, qm.x - (Mr * pm.x - Mi * pm.y), qm.y - (Mr * pm.y + Mi * pm.x), g.cam0);
+    clampZoomAbout(qm);
+    applyCam();
+    g.qm = qm;
     return;
   }
   const m = inv();
@@ -283,12 +319,14 @@ function move(e) {
     if (g.kind === 'move') snapshot();
   }
   switch (g.kind) {
-    case 'none':
-      if (g.moved && view.k > 1.01) {
-        pinTo(g.p0, e.clientX, e.clientY);
-        svg.classList.add('panning');
-      }
+    case 'none': {
+      if (!g.moved) return;
+      const q = screenToView(e.clientX, e.clientY);
+      Object.assign(cam, { ...g.cam0, bx: g.cam0.bx + q.x - g.v0.x, by: g.cam0.by + q.y - g.v0.y });
+      applyCam();
+      svg.classList.add('panning');
       break;
+    }
     case 'move': {
       if (!g.moved) return;
       const el = findEl(g.id);
@@ -314,6 +352,8 @@ function move(e) {
       break;
     case 'zone':
       g.end = pt;
+      g.cx1 = e.clientX;
+      g.cy1 = e.clientY;
       if (g.shape === 'free') {
         const l = g.points[g.points.length - 1];
         if (Math.hypot(pt.x - l[0], pt.y - l[1]) > 0.06) g.points.push([pt.x, pt.y]);
@@ -332,17 +372,16 @@ function up(e) {
   const g = gestures.get(e.pointerId);
   if (!g) return;
   gestures.delete(e.pointerId);
-  if (g.kind === 'swipe') return endSwipe(g);
+  if (g.kind === 'cam2') return endCam2(g);
   const s = scale();
   const p = page();
-  const pg0 = p;
   switch (g.kind) {
     case 'move':
       trash.classList.remove('show', 'hot');
       if (!g.moved) select(g.id);
       else if (overTrash(e.clientX, e.clientY)) {
         // Snapshot wurde beim Drag-Start angelegt → ein Undo stellt das Element wieder her
-        pg0.elements = pg0.elements.filter((x) => x.id !== g.id);
+        p.elements = p.elements.filter((x) => x.id !== g.id);
         if (state.selectionId === g.id) state.selectionId = null;
         changed();
         emit('ui');
@@ -371,10 +410,12 @@ function up(e) {
       setTool('select');
       break;
     case 'zone': {
-      const z = zoneFrom(g);
+      const z = zoneFrom(g, inv());
       if (z) {
         commit((pg) => pg.elements.push(z));
         setTool('select');
+        // Polygon direkt auswählen, damit die Ecken sofort angepasst werden können
+        if (z.shape === 'poly') select(z.id);
       }
       break;
     }
@@ -398,13 +439,14 @@ function up(e) {
 function cancel(e) {
   const g = gestures.get(e.pointerId);
   if (!g) return;
-  if (g.kind === 'swipe') g.ids.forEach((i) => gestures.delete(i));
+  if (g.kind === 'cam2') g.ids.forEach((i) => gestures.delete(i));
   else abort(e.pointerId, g);
 }
 
 function abort(id, g) {
   gestures.delete(id);
   trash.classList.remove('show', 'hot');
+  svg.classList.remove('panning');
   if (g.kind === 'move' && g.moved) {
     const el = findEl(g.id);
     if (el) {
@@ -415,30 +457,31 @@ function abort(id, g) {
   gLive.innerHTML = '';
 }
 
-function endSwipe(g) {
+function endCam2(g) {
   g.ids.forEach((i) => gestures.delete(i));
   let dx = 0, dy = 0;
   for (const id of g.ids) {
     dx += (g.pos[id].x - g.start[id].x) / 2;
     dy += (g.pos[id].y - g.start[id].y) / 2;
   }
-  const zoomChanged = Math.abs(view.k / g.k0 - 1) > 0.1;
-  if (g.k0 <= 1.01 && !zoomChanged && Math.abs(dx) > 90 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
+  // Reiner Zwei-Finger-Wisch (ohne Zoom/Drehung, aus der Grundansicht) → Seite wechseln
+  const zoomed = Math.abs(camK() - 1) > 0.1;
+  const turned = Math.abs(camAngle()) > (10 * Math.PI) / 180;
+  if (isIdentity(g.cam0) && !zoomed && !turned && Math.abs(dx) > 90 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
+    resetView();
     const pages = board().pages;
     const i = pageIndex() + (dx < 0 ? 1 : -1);
-    view.k = g.k0;
-    view.cx = g.c0.cx;
-    view.cy = g.c0.cy;
-    applyView();
     if (i >= 0 && i < pages.length) switchPage(pages[i].id);
+    return;
   }
+  if (g.qm) snapRotation(g.qm);
 }
 
 // ---------- Helfer ----------
 function addPoint(g, p, pr) {
   const l = g.points[g.points.length - 1];
   const d = Math.hypot(p.x - l[0], p.y - l[1]);
-  if (d < 0.012) return;
+  if (d < 0.012 / Math.max(1, camK())) return;
   const k = 0.75; // leichte Glättung
   g.points.push([l[0] + (p.x - l[0]) * k, l[1] + (p.y - l[1]) * k, l[2] * 0.4 + pr * 0.6]);
 }
@@ -451,7 +494,7 @@ function translate(el, o, dx, dy) {
       el.y = r3(o.y + dy);
       break;
     case 'zone':
-      if (el.shape === 'free') el.points = o.points.map((q) => [r3(q[0] + dx), r3(q[1] + dy)]);
+      if (o.points) el.points = o.points.map((q) => [r3(q[0] + dx), r3(q[1] + dy)]);
       else {
         el.x = r3(o.x + dx);
         el.y = r3(o.y + dy);
@@ -467,11 +510,12 @@ function translate(el, o, dx, dy) {
 function applyHandle(g, pt) {
   const el = findEl(g.id);
   if (!el) return;
+  if (g.h[0] === 'v' && el.points) {
+    const i = +g.h.slice(1);
+    if (el.points[i]) el.points[i] = [r3(pt.x), r3(pt.y)];
+    return;
+  }
   switch (g.h) {
-    case 'br':
-      el.w = r3(Math.max(0.2, pt.x - el.x));
-      el.h = r3(Math.max(0.2, pt.y - el.y));
-      break;
     case 'r':
       el.r = r3(Math.max(0.15, dist(pt, el)));
       break;
@@ -487,21 +531,26 @@ function applyHandle(g, pt) {
   }
 }
 
-function zoneFrom(g) {
-  const base = { id: uid(), type: 'zone', shape: g.shape, color: state.color === 'ink' ? '#f59e0b' : state.color, opacity: 0.3 };
-  const a = g.start, b = g.end;
-  if (g.shape === 'rect') {
-    const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
-    if (w < 0.2 || h < 0.2) return null;
-    return { ...base, x: r3(Math.min(a.x, b.x)), y: r3(Math.min(a.y, b.y)), w: r3(w), h: r3(h) };
+/** Neue Zone aus der Geste. Rechteck/Dreieck werden am Bildschirm ausgerichtet und als Polygon gespeichert. */
+function zoneFrom(g, m) {
+  const base = { id: uid(), type: 'zone', color: state.color === 'ink' ? '#f59e0b' : state.color, opacity: 0.3 };
+  if (g.shape === 'rect' || g.shape === 'tri') {
+    const x0 = Math.min(g.cx0, g.cx1), x1 = Math.max(g.cx0, g.cx1);
+    const y0 = Math.min(g.cy0, g.cy1), y1 = Math.max(g.cy0, g.cy1);
+    if (x1 - x0 < 14 || y1 - y0 < 14) return null;
+    const corners = g.shape === 'rect'
+      ? [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+      : [[(x0 + x1) / 2, y0], [x1, y1], [x0, y1]];
+    return { ...base, shape: 'poly', points: corners.map(([cx, cy]) => { const p = toW(m, cx, cy); return [r3(p.x), r3(p.y)]; }) };
   }
+  const a = g.start, b = g.end;
   if (g.shape === 'circle') {
     const r = dist(a, b);
     if (r < 0.15) return null;
-    return { ...base, x: r3(a.x), y: r3(a.y), r: r3(r) };
+    return { ...base, shape: 'circle', x: r3(a.x), y: r3(a.y), r: r3(r) };
   }
   if (g.points.length < 4) return null;
-  return { ...base, points: g.points.map((q) => [r3(q[0]), r3(q[1])]) };
+  return { ...base, shape: 'free', points: g.points.map((q) => [r3(q[0]), r3(q[1])]) };
 }
 
 function eraseAt(g, pt) {
@@ -540,8 +589,8 @@ function live(g) {
   else if (g.kind === 'arrow' && dist(g.start, g.end) > 0.05)
     out = renderOne({ id: 'live', type: 'arrow', x1: g.start.x, y1: g.start.y, x2: g.end.x, y2: g.end.y, color: state.color, width: state.width * s, dashed: state.arrowDashed }, p, b, rot());
   else if (g.kind === 'zone') {
-    const z = g.shape === 'free' ? { ...zoneFrom({ ...g, points: [...g.points, [g.end.x, g.end.y]] }) } : zoneFrom(g);
-    if (z && z.type) out = renderOne({ ...z, id: 'live' }, p, b, rot());
+    const z = zoneFrom(g.shape === 'free' ? { ...g, points: [...g.points, [g.end.x, g.end.y]] } : g, inv());
+    if (z) out = renderOne({ ...z, id: 'live' }, p, b, rot());
   } else if (g.kind === 'marker') {
     const st = activeServeType();
     const mk = { id: 'live', type: 'marker', symbol: state.markerSymbol, color: st ? st.color : state.color, x: g.end.x, y: g.end.y };

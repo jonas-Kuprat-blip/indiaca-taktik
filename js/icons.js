@@ -15,6 +15,7 @@ export const I = {
   minus: svg('<path d="M5 12h14"/>'),
   fit: svg('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
   rect: svg('<rect x="3.5" y="6" width="17" height="12" rx="1.5"/>'),
+  tri: svg('<path d="M12 4l9 16H3z"/>'),
   circle: svg('<circle cx="12" cy="12" r="8.5"/>'),
   free: svg('<path d="M6 7.5C8.5 3.5 18 3 19.5 8s-2.5 9.5-7 10.5S3 18 3.5 14 4.8 9.5 6 7.5z"/>'),
   dot: svg('<circle cx="12" cy="12" r="5" fill="currentColor"/>'),

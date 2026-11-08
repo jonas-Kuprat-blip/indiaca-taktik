@@ -2,25 +2,15 @@ import { h, colorCss } from '../util.js';
 import { I } from '../icons.js';
 import { state, on, set, setTool, board, setTeam } from '../store.js';
 import { dropPlayer, addPlayerDefault } from '../stage.js';
-import { promptText, colorPicker, menu } from './dialogs.js';
+import { colorPicker } from './dialogs.js';
 
 export function initPalette(root) {
   // --- Spieler ---
   const teamCols = ['own', 'opp'].map((team) => {
-    const head = h('button', { class: 'team-head', title: 'Team bearbeiten' });
-    head.onclick = () =>
-      menu(head, [
-        {
-          label: 'Teamname ändern', icon: I.edit,
-          onClick: async () => {
-            const n = await promptText('Teamname', board().teams[team].name);
-            if (n) setTeam(team, { name: n });
-          },
-        },
-        { label: 'Teamfarbe ändern', icon: I.theme, onClick: () => colorPicker(head, board().teams[team].color, (c) => setTeam(team, { color: c }), { allowInk: false }) },
-      ]);
+    const head = h('button', { class: 'team-head', title: 'Teamfarbe ändern', 'aria-label': 'Teamfarbe ändern' });
+    head.onclick = () => colorPicker(head, board().teams[team].color, (c) => setTeam(team, { color: c }), { allowInk: false });
     const tokens = [1, 2, 3, 4, 5].map((n) => {
-      const t = h('div', { class: 'token', role: 'button', 'aria-label': `Spieler ${n}` }, String(n));
+      const t = h('div', { class: 'token', role: 'button', 'aria-label': `Spieler ${n} (${team === 'own' ? 'eigenes Team' : 'Gegner'})` });
       bindTokenDrag(t, team, n);
       return t;
     });
@@ -33,7 +23,7 @@ export function initPalette(root) {
     b.dataset.tool = tool;
     return b;
   };
-  const zoneBtns = [toolBtn('rect', I.rect, 'Rechteck'), toolBtn('circle', I.circle, 'Kreis'), toolBtn('free', I.free, 'Freiform')];
+  const zoneBtns = [toolBtn('rect', I.rect, 'Rechteck'), toolBtn('tri', I.tri, 'Dreieck'), toolBtn('circle', I.circle, 'Kreis'), toolBtn('free', I.free, 'Freiform')];
   const markerBtns = [
     toolBtn('marker', I.dot, 'Punkt', () => set({ markerSymbol: 'dot' })),
     toolBtn('marker', I.x, 'Kreuz', () => set({ markerSymbol: 'x' })),
@@ -52,7 +42,7 @@ export function initPalette(root) {
     if (!b) return;
     for (const c of teamCols) {
       const t = b.teams[c.team];
-      c.head.innerHTML = `<span class="dot" style="background:${colorCss(t.color)}"></span><span class="tn">${t.name.replace(/</g, '&lt;')}</span>`;
+      c.head.innerHTML = `<span class="dot" style="background:${colorCss(t.color)}"></span>`;
       c.tokens.forEach((tk) => (tk.style.background = colorCss(t.color)));
     }
     zoneBtns.forEach((x) => x.classList.toggle('active', state.tool === x.dataset.tool));

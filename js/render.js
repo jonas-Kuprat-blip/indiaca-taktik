@@ -18,12 +18,32 @@ export function viewBox(ft, half = false, rot = 0) {
 export const worldTransform = (rot) => (rot ? 'rotate(-90)' : '');
 
 // ---------- Feld ----------
-export function renderField(b, rot = 0) {
+/** Parkett-Muster in Metern (dreht/zoomt mit dem Feld). Dielen 0,2 m breit, 1,2 m lang, versetzt. */
+function parquetPattern() {
+  const PL = 1.2, PW = 0.2, ROWS = 4, TW = PL * 2;
+  const offs = [0, 0.6, 0.3, 0.9];
+  let planks = '';
+  for (let r = 0; r < ROWS; r++) {
+    const y = r * PW;
+    for (let k = -1; k <= 2; k++) {
+      const x = offs[r] + k * PL;
+      const tone = (((k % 2) + 2) % 2 + r) % 3;
+      planks += `<rect class="pk${tone}" x="${f(x)}" y="${f(y)}" width="${PL}" height="${PW}"/>` +
+        `<line class="pk-grain" x1="${f(x + 0.08)}" y1="${f(y + PW * 0.38)}" x2="${f(x + PL * 0.55)}" y2="${f(y + PW * 0.42)}"/>` +
+        `<line class="pk-grain" x1="${f(x + PL * 0.4)}" y1="${f(y + PW * 0.7)}" x2="${f(x + PL - 0.1)}" y2="${f(y + PW * 0.66)}"/>` +
+        `<line class="pk-seam" x1="${f(x)}" y1="${f(y)}" x2="${f(x)}" y2="${f(y + PW)}"/>`;
+    }
+    planks += `<line class="pk-seam" x1="0" y1="${f(y)}" x2="${TW}" y2="${f(y)}"/>`;
+  }
+  return `<defs><pattern id="parkett" patternUnits="userSpaceOnUse" width="${TW}" height="${f(PW * ROWS)}">${planks}</pattern></defs>`;
+}
+
+export function renderField(b) {
   const F = FIELDS[b.fieldType];
-  const L = F.length, W = F.width, a = F.attack, m = F.margin, s = F.s;
+  const L = F.length, W = F.width, a = F.attack, m = F.margin;
   const x0 = -L / 2 - m, y0 = -W / 2 - m;
-  const ly = -W / 2 - m * 0.45;
-  return `
+  return `${parquetPattern()}
+  <rect fill="url(#parkett)" x="${x0}" y="${y0}" width="${L + 2 * m}" height="${W + 2 * m}"/>
   <rect class="f-out" x="${x0}" y="${y0}" width="${L + 2 * m}" height="${W + 2 * m}"/>
   <rect class="f-court" x="${-L / 2}" y="${-W / 2}" width="${L}" height="${W}"/>
   <line class="f-line f-att" x1="${-a}" y1="${-W / 2}" x2="${-a}" y2="${W / 2}"/>
@@ -31,15 +51,8 @@ export function renderField(b, rot = 0) {
   <rect class="f-line" x="${-L / 2}" y="${-W / 2}" width="${L}" height="${W}"/>
   <line class="f-net" x1="0" y1="${-W / 2 - 0.45}" x2="0" y2="${W / 2 + 0.45}"/>
   <circle class="f-post" cx="0" cy="${-W / 2 - 0.45}" r="0.1"/>
-  <circle class="f-post" cx="0" cy="${W / 2 + 0.45}" r="0.1"/>
-  ${teamLabel(b.teams.own.name, rot ? -(L / 2 + m * 0.45) : -L / 4, rot ? 0 : ly, s, rot)}
-  ${teamLabel(b.teams.opp.name, rot ? L / 2 + m * 0.45 : L / 4, rot ? 0 : ly, s, rot)}`;
+  <circle class="f-post" cx="0" cy="${W / 2 + 0.45}" r="0.1"/>`;
 }
-
-const teamLabel = (name, x, y, s, rot) =>
-  `<text class="f-label" x="${f(x)}" y="${f(y)}" font-size="${0.42 * s}" text-anchor="middle" dominant-baseline="central"${
-    rot ? ` transform="rotate(${rot} ${f(x)} ${f(y)})"` : ''
-  }>${esc(name)}</text>`;
 
 // ---------- Elemente ----------
 const strokeCache = new Map();
@@ -89,15 +102,12 @@ export function renderOne(el, page, b, rot = 0) {
       const R = 0.4 * s;
       return `<g class="el pl" data-id="${el.id}" transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}">
         <circle r="${R}" class="pl-c" style="fill:${colorCss(el.color)}"/>
-        <text class="pl-n" font-size="${f(R * (String(el.number).length > 2 ? 0.7 : 0.95))}" text-anchor="middle" dominant-baseline="central">${esc(el.number)}</text>
         ${el.label ? `<text class="lbl" y="${f(R + 0.32 * s)}" font-size="${f(0.32 * s)}" text-anchor="middle" dominant-baseline="central">${esc(el.label)}</text>` : ''}
       </g>`;
     }
     case 'zone': {
       const c = colorCss(el.color);
       const st = `style="fill:${c};fill-opacity:${el.opacity};stroke:${c};stroke-opacity:.85;stroke-width:${f(0.05 * s)}"`;
-      if (el.shape === 'rect')
-        return `<rect class="el zn" data-id="${el.id}" x="${f(el.x)}" y="${f(el.y)}" width="${f(el.w)}" height="${f(el.h)}" rx="0.06" ${st}/>`;
       if (el.shape === 'circle')
         return `<circle class="el zn" data-id="${el.id}" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(el.r)}" ${st}/>`;
       return `<path class="el zn" data-id="${el.id}" d="M${el.points.map((p) => `${f(p[0])} ${f(p[1])}`).join('L')}Z" ${st}/>`;
@@ -136,7 +146,7 @@ export function renderElements(page, b, rot = 0) {
 
 // ---------- Auswahl-Overlay ----------
 const handle = (name, x, y, s) =>
-  `<g data-handle="${name}" transform="translate(${f(x)} ${f(y)})"><circle class="hd-hit" r="${f(0.5 * s)}"/><circle class="hd" r="${f(0.17 * s)}"/></g>`;
+  `<g data-handle="${name}" transform="translate(${f(x)} ${f(y)})"><circle class="hd-hit" r="${f(0.6 * s)}"/><circle class="hd" r="${f(0.22 * s)}"/></g>`;
 
 export function renderSelection(el, page, b) {
   const s = FIELDS[b.fieldType].s;
@@ -149,8 +159,9 @@ export function renderSelection(el, page, b) {
     case 'arrow':
       return handle('a1', el.x1, el.y1, s) + handle('a2', el.x2, el.y2, s);
     case 'zone':
-      if (el.shape === 'rect')
-        return `<rect class="sel" x="${f(el.x - pad)}" y="${f(el.y - pad)}" width="${f(el.w + 2 * pad)}" height="${f(el.h + 2 * pad)}"/>` + handle('br', el.x + el.w, el.y + el.h, s);
+      if (el.shape === 'poly')
+        return `<path class="sel" d="M${el.points.map((p) => `${f(p[0])} ${f(p[1])}`).join('L')}Z"/>` +
+          el.points.map((p, i) => handle('v' + i, p[0], p[1], s)).join('');
       if (el.shape === 'circle')
         return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(el.r + pad)}"/>` + handle('r', el.x + el.r, el.y, s);
       {

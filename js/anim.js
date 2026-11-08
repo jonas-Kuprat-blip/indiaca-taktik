@@ -30,13 +30,26 @@ export function capture(p = page()) {
   if (!isAnim(p)) return;
   ensureAnim(p);
   const st = p.anim.steps[p.anim.cur];
+  const old = st.els || {};
   st.els = {};
-  for (const e of animEls(p)) st.els[e.id] = clone(e);
+  for (const e of animEls(p)) {
+    st.els[e.id] = clone(e);
+    // Spielername gilt für alle Schritte: geänderten Namen überall übernehmen
+    if (e.type === 'player' && (old[e.id]?.label || '') !== (e.label || ''))
+      for (const other of p.anim.steps) if (other.els[e.id]) other.els[e.id].label = e.label || '';
+  }
+}
+/** Fehlende Spielernamen aus anderen Schritten ergänzen (z. B. in Schritt 1 benannt, Schritt 3 noch ohne Namen) */
+function fillNames(a) {
+  const names = {};
+  for (const st of a.steps) for (const [id, e] of Object.entries(st.els)) if (e.type === 'player' && e.label && !names[id]) names[id] = e.label;
+  for (const st of a.steps) for (const [id, e] of Object.entries(st.els)) if (e.type === 'player' && !e.label && names[id]) e.label = names[id];
 }
 /** Schritt i auf das Feld laden */
 function load(p, i) {
   const a = p.anim;
   a.cur = Math.max(0, Math.min(i, a.steps.length - 1));
+  fillNames(a);
   p.elements = p.elements.filter(isStatic).concat(Object.values(a.steps[a.cur].els).map(clone));
 }
 function refresh() {

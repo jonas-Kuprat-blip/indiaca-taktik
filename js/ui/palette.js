@@ -22,7 +22,9 @@ export function initPalette(root) {
   const markerBtns = [
     toolBtn('marker', I.dot, 'Punkt', () => set({ markerSymbol: 'dot' })),
     toolBtn('marker', I.x, 'Kreuz', () => set({ markerSymbol: 'x' })),
+    toolBtn('marker', I.indiaca, 'Indiaca', () => set({ markerSymbol: 'indiaca' })),
   ];
+  markerBtns[2].dataset.symbol = 'indiaca';
   markerBtns[0].dataset.symbol = 'dot';
   markerBtns[1].dataset.symbol = 'x';
 

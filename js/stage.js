@@ -17,7 +17,7 @@ import { I } from './icons.js';
  * auch gezoomt/gedreht exakt an der richtigen Stelle, und alles bewegt sich gemeinsam mit dem Feld.
  */
 
-let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar;
+let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar, rotpanel, rotInput, rotLabel, rotBtn;
 let drawnKey = '';
 const gestures = new Map(); // pointerId → Geste
 const rot = () => (pageOrientation() === 'quer' ? 0 : 90);
@@ -33,6 +33,16 @@ const isIdentity = (c = cam) => Math.abs(c.mr - 1) < 0.01 && Math.abs(c.mi) < 0.
 function applyCam() {
   gCam.setAttribute('transform', `matrix(${cam.mr} ${cam.mi} ${-cam.mi} ${cam.mr} ${cam.bx} ${cam.by})`);
   zoombar?.classList.toggle('zoomed', !isIdentity());
+  if (rotInput && document.activeElement !== rotInput) {
+    const deg = Math.round((camAngle() * 180) / Math.PI);
+    rotInput.value = deg;
+    rotLabel.textContent = deg + '°';
+  }
+}
+/** Feld auf einen bestimmten Winkel drehen (um die Bildschirmmitte) */
+function setAngle(deg) {
+  rotateAbout(viewCenter(), (deg * Math.PI) / 180 - camAngle());
+  rotLabel.textContent = Math.round(deg) + '°';
 }
 /** Ähnlichkeitsabbildung S(z) = M·z + B auf die Kamera anwenden (C ← S ∘ C) */
 function composeCam(Mr, Mi, Bx, By, base = cam) {
@@ -73,13 +83,6 @@ export function resetView() {
   Object.assign(cam, { mr: 1, mi: 0, bx: 0, by: 0 });
   applyCam();
 }
-/** Am Ende einer Drehgeste auf 0°/90°/180°/270° einrasten, wenn nah dran */
-function snapRotation(p) {
-  const a = camAngle();
-  const t = Math.round(a / (Math.PI / 2)) * (Math.PI / 2);
-  if (Math.abs(a - t) < (6 * Math.PI) / 180) rotateAbout(p, t - a);
-}
-
 // ---------- Aufbau ----------
 export function initStage(wrap) {
   svg = document.createElementNS(NS, 'svg');
@@ -103,20 +106,44 @@ export function initStage(wrap) {
     b.onclick = fn;
     return b;
   };
+  rotBtn = zb('Feld drehen', I.turn, () => {
+    rotpanel.classList.toggle('show');
+    rotBtn.classList.toggle('active', rotpanel.classList.contains('show'));
+  });
+  const resetBtn = zb('Ansicht zurücksetzen (gerade, 100 %)', I.reset, resetView);
+  resetBtn.classList.add('reset-btn');
   zoombar.append(
+    rotBtn,
+    resetBtn,
     zb('Vergrößern', I.plus, () => zoomAt(viewCenter(), 1.4)),
-    zb('Verkleinern', I.minus, () => zoomAt(viewCenter(), 1 / 1.4)),
-    zb('Ansicht zurücksetzen (100 %, 0°)', I.fit, resetView)
+    zb('Verkleinern', I.minus, () => zoomAt(viewCenter(), 1 / 1.4))
   );
-  wrap.append(svg, trash, zoombar);
+  // Dreh-Regler
+  rotpanel = document.createElement('div');
+  rotpanel.id = 'rotpanel';
+  rotInput = document.createElement('input');
+  Object.assign(rotInput, { type: 'range', min: -180, max: 180, step: 1, value: 0 });
+  rotInput.setAttribute('aria-label', 'Drehwinkel');
+  rotLabel = document.createElement('span');
+  rotLabel.className = 'deg';
+  rotLabel.textContent = '0°';
+  rotInput.addEventListener('input', () => {
+    // Bei 0°/±90°/180° leicht einrasten
+    let d = +rotInput.value;
+    const snap = Math.round(d / 90) * 90;
+    if (Math.abs(d - snap) <= 3) d = snap;
+    setAngle(d);
+  });
+  const zero = zb('Auf 0° stellen', '0°', () => setAngle(0));
+  zero.classList.add('small');
+  rotpanel.append(rotInput, rotLabel, zero);
+  wrap.append(svg, trash, zoombar, rotpanel);
   [gCam, gWorld, gField, gEls, gLive, gSel] = ['#g-cam', '#g-world', '#g-field', '#g-els', '#g-live', '#g-sel'].map((s) => svg.querySelector(s));
 
-  // Mac: Trackpad-Pinch/Mausrad = Zoom, mit Shift = Drehen
+  // Mac: Trackpad-Pinch/Mausrad = Zoom (Drehen nur über den Regler)
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const p = screenToView(e.clientX, e.clientY);
-    if (e.shiftKey) rotateAbout(p, (e.deltaY || e.deltaX) * 0.004);
-    else zoomAt(p, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)));
+    zoomAt(screenToView(e.clientX, e.clientY), Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)));
   }, { passive: false });
 
   svg.addEventListener('pointerdown', down);
@@ -305,8 +332,8 @@ function move(e) {
     const [q1, q2] = g.ids.map((i) => screenToView(g.pos[i].x, g.pos[i].y));
     // M = (q2 − q1) / (p2 − p1) als komplexe Division
     const ax = p2.x - p1.x, ay = p2.y - p1.y, bx = q2.x - q1.x, by = q2.y - q1.y;
-    const den = ax * ax + ay * ay || 1e-9;
-    const Mr = (bx * ax + by * ay) / den, Mi = (by * ax - bx * ay) / den;
+    // nur Zoomfaktor (Abstandsverhältnis), keine Drehung
+    const Mr = Math.hypot(bx, by) / (Math.hypot(ax, ay) || 1e-9), Mi = 0;
     // Mittelpunkt der Finger bleibt unter den Fingern
     const pm = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }, qm = { x: (q1.x + q2.x) / 2, y: (q1.y + q2.y) / 2 };
     composeCam(Mr, Mi, qm.x - (Mr * pm.x - Mi * pm.y), qm.y - (Mr * pm.y + Mi * pm.x), g.cam0);
@@ -469,15 +496,13 @@ function endCam2(g) {
   }
   // Reiner Zwei-Finger-Wisch (ohne Zoom/Drehung, aus der Grundansicht) → Seite wechseln
   const zoomed = Math.abs(camK() - 1) > 0.1;
-  const turned = Math.abs(camAngle()) > (10 * Math.PI) / 180;
-  if (isIdentity(g.cam0) && !zoomed && !turned && Math.abs(dx) > 90 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
+  if (isIdentity(g.cam0) && !zoomed && Math.abs(dx) > 90 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
     resetView();
     const pages = board().pages;
     const i = pageIndex() + (dx < 0 ? 1 : -1);
     if (i >= 0 && i < pages.length) switchPage(pages[i].id);
     return;
   }
-  if (g.qm) snapRotation(g.qm);
 }
 
 // ---------- Helfer ----------

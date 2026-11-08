@@ -75,6 +75,15 @@ function arrowMarkup(x1, y1, x2, y2, color, w, dashed, cls = 'ar-l') {
 
 export function symbolMarkup(symbol, color, s) {
   const c = colorCss(color);
+  if (symbol === 'indiaca') {
+    // Indiaca: gelber Puffer, schwarzer Schaft, drei rote Federn
+    const k = (n) => f(n * s);
+    const feather = (deg) =>
+      `<ellipse cx="0" cy="${k(-0.15)}" rx="${k(0.075)}" ry="${k(0.2)}" transform="rotate(${deg} 0 ${k(0.04)})" class="ind-f"/>`;
+    return `<circle r="${k(0.42)}" class="hit-a"/>${feather(-28)}${feather(28)}${feather(0)}` +
+      `<rect x="${k(-0.045)}" y="${k(0.02)}" width="${k(0.09)}" height="${k(0.17)}" rx="${k(0.02)}" class="ind-s"/>` +
+      `<ellipse cx="0" cy="${k(0.22)}" rx="${k(0.17)}" ry="${k(0.07)}" class="ind-p"/>`;
+  }
   if (symbol === 'dot') return `<circle r="${f(0.22 * s)}" class="mk-dot" style="fill:${c}"/>`;
   const a = f(0.24 * s);
   const d = `M${-a} ${-a}L${a} ${a}M${-a} ${a}L${a} ${-a}`;
@@ -127,9 +136,10 @@ export function renderOne(el, page, b, rot = 0) {
         from = `<circle cx="${f(el.from.x)}" cy="${f(el.from.y)}" r="${f(0.12 * s)}" style="fill:${colorCss(c)}"/>` +
           arrowMarkup(el.from.x, el.from.y, el.x - (dx / l) * gap, el.y - (dy / l) * gap, c, 0.06 * s, true);
       }
-      return `<g class="el mk" data-id="${el.id}">${from}<g transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}"><circle class="hit-a" r="${f(0.45 * s)}"/>${symbolMarkup(el.symbol, c, s)}${
+      const ms = s * (el.size || 1);
+      return `<g class="el mk" data-id="${el.id}">${from}<g transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}"><circle class="hit-a" r="${f(0.45 * ms)}"/>${symbolMarkup(el.symbol, c, ms)}${
         el.label
-          ? `<text class="lbl" x="${f(0.34 * s)}" y="${f(-0.34 * s)}" font-size="${f(0.32 * s)}" dominant-baseline="central">${esc(el.label)}</text>`
+          ? `<text class="lbl" x="${f(0.34 * ms)}" y="${f(-0.34 * ms)}" font-size="${f(0.32 * s)}" dominant-baseline="central">${esc(el.label)}</text>`
           : ''
       }</g></g>`;
     }
@@ -155,7 +165,7 @@ export function renderSelection(el, page, b) {
     case 'player':
       return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.45 * s * (el.size || 1) + pad)}"/>`;
     case 'marker':
-      return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.36 * s)}"/>` + (el.from ? handle('from', el.from.x, el.from.y, s) : '');
+      return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.4 * s * (el.size || 1))}"/>` + (el.from ? handle('from', el.from.x, el.from.y, s) : '');
     case 'arrow':
       return handle('a1', el.x1, el.y1, s) + handle('a2', el.x2, el.y2, s);
     case 'zone':

@@ -50,6 +50,38 @@ export function initSelectionBar(wrap) {
       },
     });
   const lbl = (t) => h('span', { class: 'sel-lbl' }, t);
+  // Während ein Regler gezogen wird, die Leiste nicht neu aufbauen
+  let sliding = false;
+  const slider = (el, key, min, max, step, label, def) => {
+    const r = h('input', { type: 'range', min, max, step, value: el[key] ?? def, class: 'range', 'aria-label': label });
+    r.addEventListener('pointerdown', () => { sliding = true; snapshot(); });
+    const stop = () => (sliding = false);
+    r.addEventListener('pointerup', stop);
+    r.addEventListener('pointercancel', stop);
+    r.addEventListener('change', stop);
+    r.addEventListener('input', () => { findEl(el.id)[key] = +r.value; changed(); });
+    return r;
+  };
+  /** Form um ihren Mittelpunkt skalieren */
+  const scaleEl = (id, k) =>
+    commit(() => {
+      const el = findEl(id);
+      if (el.type === 'zone' && el.shape === 'circle') el.r = Math.max(0.15, el.r * k);
+      else if (el.points) {
+        const cx = el.points.reduce((a, p) => a + p[0], 0) / el.points.length;
+        const cy = el.points.reduce((a, p) => a + p[1], 0) / el.points.length;
+        el.points = el.points.map(([x, y]) => [Math.round((cx + (x - cx) * k) * 1000) / 1000, Math.round((cy + (y - cy) * k) * 1000) / 1000]);
+      } else if (el.type === 'arrow') {
+        const mx = (el.x1 + el.x2) / 2, my = (el.y1 + el.y2) / 2;
+        el.x1 = mx + (el.x1 - mx) * k; el.y1 = my + (el.y1 - my) * k;
+        el.x2 = mx + (el.x2 - mx) * k; el.y2 = my + (el.y2 - my) * k;
+      }
+    });
+  const sizeBtns = (el) => [
+    lbl('Größe'),
+    h('button', { class: 'btn', html: I.minus, 'aria-label': 'Kleiner', title: 'Kleiner', onclick: () => scaleEl(el.id, 1 / 1.15) }),
+    h('button', { class: 'btn', html: I.plus, 'aria-label': 'Größer', title: 'Größer', onclick: () => scaleEl(el.id, 1.15) }),
+  ];
 
   const build = () => {
     const el = state.selectionId && findEl(state.selectionId);
@@ -61,16 +93,15 @@ export function initSelectionBar(wrap) {
     }
     const parts = [];
     if (el.type === 'player') {
-      const sz = h('input', { type: 'range', min: '0.5', max: '2', step: '0.1', value: el.size || 1, class: 'range', 'aria-label': 'Größe' });
-      sz.addEventListener('pointerdown', snapshot);
-      sz.addEventListener('input', () => { findEl(el.id).size = +sz.value; changed(); });
-      parts.push(lbl('Größe'), sz, textInput(el, 'label', 'Name (optional)', 10), swatches(el), dup(el));
+      parts.push(lbl('Größe'), slider(el, 'size', '0.5', '2', '0.1', 'Größe', 1), textInput(el, 'label', 'Name (optional)', 10), swatches(el), dup(el));
     } else if (el.type === 'marker') {
       const p = page();
       parts.push(
         h('button', { class: 'btn' + (el.symbol === 'dot' ? ' active' : ''), html: I.dot, 'aria-label': 'Punkt', onclick: () => commit(() => (findEl(el.id).symbol = 'dot')) }),
         h('button', { class: 'btn' + (el.symbol === 'x' ? ' active' : ''), html: I.x, 'aria-label': 'Kreuz', onclick: () => commit(() => (findEl(el.id).symbol = 'x')) }),
-        textInput(el, 'label', 'Beschriftung', 12)
+        h('button', { class: 'btn' + (el.symbol === 'indiaca' ? ' active' : ''), html: I.indiaca, 'aria-label': 'Indiaca', onclick: () => commit(() => (findEl(el.id).symbol = 'indiaca')) }),
+        lbl('Größe'), slider(el, 'size', '0.5', '2.5', '0.1', 'Größe', 1),
+        textInput(el, 'label', 'Beschriftung', 10)
       );
       if (el.serveType && p.serveTypes?.length) {
         const s = h('select', { class: 'input sm select' }, p.serveTypes.map((t) => h('option', { value: t.id, selected: t.id === el.serveType }, t.name)));
@@ -80,12 +111,10 @@ export function initSelectionBar(wrap) {
       if (el.from) parts.push(h('button', { class: 'btn text small', onclick: () => commit(() => delete findEl(el.id).from) }, 'Pfeil weg'));
       else parts.push(h('button', { class: 'btn text small', onclick: () => commit(() => (findEl(el.id).from = { x: el.x - 2 * scale(), y: el.y })) }, '+ Pfeil'));
     } else if (el.type === 'zone') {
-      const r = h('input', { type: 'range', min: '0.1', max: '0.8', step: '0.05', value: el.opacity, class: 'range', 'aria-label': 'Deckkraft' });
-      r.addEventListener('pointerdown', snapshot);
-      r.addEventListener('input', () => { findEl(el.id).opacity = +r.value; changed(); });
-      parts.push(swatches(el), lbl('Deckkraft'), r, dup(el));
+      const r = slider(el, 'opacity', '0.1', '0.8', '0.05', 'Deckkraft', 0.3);
+      parts.push(...sizeBtns(el), swatches(el), lbl('Deckkraft'), r, dup(el));
     } else if (el.type === 'arrow') {
-      parts.push(swatches(el),
+      parts.push(...sizeBtns(el), swatches(el),
         h('button', { class: 'btn' + (el.dashed ? ' active' : ''), html: I.dash, 'aria-label': 'Gestrichelt', onclick: () => commit(() => (findEl(el.id).dashed = !el.dashed)) }),
         dup(el));
     }
@@ -101,7 +130,7 @@ export function initSelectionBar(wrap) {
       if (state.tool === 'marker') t = 'Tippen: Ziel setzen · Ziehen: Ziel mit Pfeil vom Startpunkt';
       else if (state.tool === 'cone') t = 'Vom Spieler aus in Blickrichtung ziehen';
       else if (['rect', 'tri', 'circle', 'free'].includes(state.tool)) t = 'Ziehen, um die Form aufzuziehen';
-      else if (state.tool === 'select') t = 'Antippen: auswählen · Ziehen: verschieben · 2 Finger: zoomen & drehen';
+      else if (state.tool === 'select') t = 'Antippen: auswählen · Ziehen: verschieben · 2 Finger: zoomen';
       else if (p.kind === 'angabe' && state.tool !== 'eraser') t = '';
     }
     hint.textContent = t;
@@ -114,7 +143,7 @@ export function initSelectionBar(wrap) {
   });
   on('elements', () => {
     // Nicht neu aufbauen, während getippt wird
-    if (bar.contains(document.activeElement)) return;
+    if (sliding || bar.contains(document.activeElement)) return;
     if (shownId !== state.selectionId || state.selectionId) build();
   });
   on('page', updateHint);

@@ -137,7 +137,13 @@ export function initStage(wrap) {
   const zero = zb('Auf 0° stellen', '0°', () => setAngle(0));
   zero.classList.add('small');
   rotpanel.append(rotInput, rotLabel, zero);
-  wrap.append(svg, trash, zoombar, rotpanel);
+  // Vereinslogo fest oben rechts in der Ecke (außerhalb des Feldes)
+  const logo = document.createElement('img');
+  logo.id = 'club-logo';
+  logo.src = 'img/logo.jpg';
+  logo.alt = 'Indiaca im CVJM Kamen e.V.';
+  logo.draggable = false;
+  wrap.append(svg, trash, zoombar, rotpanel, logo);
   [gCam, gWorld, gField, gEls, gLive, gSel] = ['#g-cam', '#g-world', '#g-field', '#g-els', '#g-live', '#g-sel'].map((s) => svg.querySelector(s));
 
   // Mac: Trackpad-Pinch/Mausrad = Zoom (Drehen nur über den Regler)

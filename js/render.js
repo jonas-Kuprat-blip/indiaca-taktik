@@ -24,7 +24,6 @@ export function renderField(b, half = false) {
   const x0 = -L / 2 - m, y0 = -W / 2 - m;
   return `<rect class="f-out" x="${x0}" y="${y0}" width="${L + 2 * m}" height="${W + 2 * m}"/>
   <rect class="f-court" x="${-L / 2}" y="${-W / 2}" width="${L}" height="${W}"/>
-  ${logoMark(F, half)}
   ${['f-edge', 'f-line'].map((c) => `
   <line class="${c}" x1="${-a}" y1="${-W / 2}" x2="${-a}" y2="${W / 2}"/>
   <line class="${c}" x1="${a}" y1="${-W / 2}" x2="${a}" y2="${W / 2}"/>
@@ -32,17 +31,6 @@ export function renderField(b, half = false) {
   <line class="f-net" x1="0" y1="${-W / 2 - 0.45}" x2="0" y2="${W / 2 + 0.45}"/>
   <circle class="f-post" cx="0" cy="${-W / 2 - 0.45}" r="0.1"/>
   <circle class="f-post" cx="0" cy="${W / 2 + 0.45}" r="0.1"/>`;
-}
-
-/** Vereinslogo großflächig und leicht transparent, längs am Feld ausgerichtet (dreht mit dem Feld).
- *  Halbfeld-Seiten: über die eigene Hälfte, sonst über das ganze Feld. */
-function logoMark(F, half) {
-  const AR = 1.95; // Seitenverhältnis des Logos
-  const availL = half ? F.length / 2 : F.length, availW = F.width;
-  let w = availL * 0.92, hgt = w / AR;
-  if (hgt > availW * 0.92) { hgt = availW * 0.92; w = hgt * AR; }
-  const cx = half ? -F.length / 4 : 0;
-  return `<image class="f-logo" href="img/logo.jpg" x="${f(cx - w / 2)}" y="${f(-hgt / 2)}" width="${f(w)}" height="${f(hgt)}" preserveAspectRatio="xMidYMid meet"/>`;
 }
 
 // ---------- Elemente ----------

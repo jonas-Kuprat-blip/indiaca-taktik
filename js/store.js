@@ -177,6 +177,7 @@ function normalizeBoard(b) {
   b.fieldType = FIELDS[b.fieldType] ? b.fieldType : 'indiaca';
   b.teams ||= clone(TEAM_DEFAULT);
   if (!b.stats || typeof b.stats !== 'object') b.stats = {};
+  if (!b.statsTeam || typeof b.statsTeam !== 'object') b.statsTeam = { geschenke: 0 };
   b.name ||= 'Board';
   b.createdAt ||= Date.now();
   b.updatedAt ||= Date.now();

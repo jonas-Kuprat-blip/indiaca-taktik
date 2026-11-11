@@ -3,6 +3,8 @@ import { strokePath } from './stroke.js';
 import { esc, colorCss } from './util.js';
 
 const f = (n) => Math.round(n * 1000) / 1000;
+/** Zusätzlicher Größenfaktor für Spieler/Marker (Handy-Layout: etwas größer) */
+export const ui = { tokenScale: 1 };
 
 /** Sichtbereich in Modellkoordinaten; half = nur eigene Hälfte; rot = 90 → Hochformat (eigene Hälfte unten) */
 export function modelBox(ft, half = false) {
@@ -102,7 +104,7 @@ export function renderOne(el, page, b, rot = 0) {
   const s = FIELDS[b.fieldType].s;
   switch (el.type) {
     case 'player': {
-      const k = el.size || 1;
+      const k = (el.size || 1) * ui.tokenScale;
       const R = 0.45 * s * k;
       return `<g class="el pl" data-id="${el.id}" transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}">
         <circle r="${f(R)}" class="pl-hit"/>${el.rot ? `<g transform="rotate(${f(el.rot)})">${playerIcon(el.color, s * k, el.role)}</g>` : playerIcon(el.color, s * k, el.role)}
@@ -136,7 +138,7 @@ export function renderOne(el, page, b, rot = 0) {
         from = `<circle cx="${f(el.from.x)}" cy="${f(el.from.y)}" r="${f(0.12 * s)}" style="fill:${colorCss(c)}"/>` +
           arrowMarkup(el.from.x, el.from.y, el.x - (dx / l) * gap, el.y - (dy / l) * gap, c, 0.06 * s, true);
       }
-      const ms = s * (el.size || 1);
+      const ms = s * (el.size || 1) * ui.tokenScale;
       return `<g class="el mk" data-id="${el.id}">${from}<g transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}"><circle class="hit-a" r="${f(0.45 * ms)}"/>${symbolMarkup(el.symbol, c, ms)}${
         el.label
           ? `<text class="lbl" x="${f(0.34 * ms)}" y="${f(-0.34 * ms)}" font-size="${f(0.32 * s)}" dominant-baseline="central">${esc(el.label)}</text>`

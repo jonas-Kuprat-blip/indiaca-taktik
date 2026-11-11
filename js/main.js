@@ -7,6 +7,7 @@ import { initNotes } from './ui/notes.js';
 import { initSelectionBar } from './ui/selection.js';
 import { initAnim } from './anim.js';
 import { initStatsTab } from './ui/stats.js';
+import { initPhone } from './phone.js';
 
 // iOS: Pinch-Zoom & Doppeltipp-Zoom der Seite unterbinden
 document.addEventListener('gesturestart', (e) => e.preventDefault());
@@ -23,6 +24,7 @@ async function start() {
   initNotes(document.getElementById('notes'), wrap);
   initStatsTab(wrap);
   initPagebar(document.getElementById('pagebar'));
+  initPhone();
   store.emit('board');
   store.emit('page');
   store.emit('elements');

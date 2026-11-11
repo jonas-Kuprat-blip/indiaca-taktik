@@ -43,7 +43,8 @@ function bindPointer() {
     if (g) return;
     const thumb = e.target.closest('.thumb');
     list.setPointerCapture(e.pointerId);
-    g = { id: e.pointerId, thumb, x0: e.clientX, y0: e.clientY, scroll0: list.scrollLeft, mode: 'pending' };
+    const vert = getComputedStyle(list).flexDirection === 'column'; // Handy-Panel: senkrechte Liste
+    g = { id: e.pointerId, thumb, x0: e.clientX, y0: e.clientY, vert, scroll0: vert ? list.scrollTop : list.scrollLeft, mode: 'pending' };
     if (thumb)
       g.timer = setTimeout(() => {
         if (g && g.mode === 'pending') {
@@ -57,19 +58,23 @@ function bindPointer() {
   });
   list.addEventListener('pointermove', (e) => {
     if (!g || e.pointerId !== g.id) return;
-    const dx = e.clientX - g.x0;
-    if (g.mode === 'pending' && Math.hypot(dx, e.clientY - g.y0) > 8) {
+    const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+    const d = g.vert ? dy : dx;
+    if (g.mode === 'pending' && Math.hypot(dx, dy) > 8) {
       g.mode = 'scroll';
       clearTimeout(g.timer);
     }
-    if (g.mode === 'scroll') list.scrollLeft = g.scroll0 - dx;
+    if (g.mode === 'scroll') {
+      if (g.vert) list.scrollTop = g.scroll0 - d;
+      else list.scrollLeft = g.scroll0 - d;
+    }
     if (g.mode === 'reorder') {
-      g.thumb.style.transform = `translateX(${dx}px)`;
+      g.thumb.style.transform = g.vert ? `translateY(${d}px)` : `translateX(${d}px)`;
       const others = [...list.children].filter((c) => c !== g.thumb);
       let to = 0;
       for (const c of others) {
         const r = c.getBoundingClientRect();
-        if (e.clientX > r.left + r.width / 2) to++;
+        if (g.vert ? e.clientY > r.top + r.height / 2 : e.clientX > r.left + r.width / 2) to++;
       }
       g.to = to;
       others.forEach((c, i) => {

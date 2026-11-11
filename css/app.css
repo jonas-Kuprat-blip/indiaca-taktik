@@ -363,3 +363,111 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
   .token { width: 38px; height: 38px; font-size: 16px; }
   .big-opts { grid-template-columns: 1fr; }
 }
+
+/* =====================================================================
+   Handy-Layout (Querformat, Höhe < 500 px) – nur unter html.phone aktiv.
+   iPad/Desktop sind davon nicht betroffen.
+   ===================================================================== */
+#phonebar, #ph-panels, #rotate-hint { display: none; }
+
+html.phone, html.phone body { height: 100dvh; }
+html.phone #app {
+  height: 100dvh; grid-template-rows: minmax(0, 1fr);
+  padding: env(safe-area-inset-top) calc(58px + env(safe-area-inset-right)) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+html.phone #toolbar { display: none; }
+html.phone #main { grid-template-columns: minmax(0, 1fr); }
+html.phone #palette { display: none; }
+
+/* Icon-Leiste rechts */
+html.phone #phonebar {
+  display: flex; position: fixed; z-index: 30; top: 0; bottom: 0; right: 0;
+  width: calc(58px + env(safe-area-inset-right));
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) 0;
+  flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  background: var(--panel); border-left: 1px solid var(--border);
+}
+.ph-btn {
+  width: 56px; min-height: 46px; flex: 1 1 auto; max-height: 56px; border: 0; background: transparent; color: inherit;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  border-radius: 10px; touch-action: manipulation; cursor: pointer;
+}
+.ph-ic svg { width: 22px; height: 22px; display: block; }
+.ph-lbl { font-size: 8.5px; font-weight: 700; letter-spacing: -.01em; max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-btn.open { background: var(--panel2); color: var(--accent); }
+.ph-btn.drawing { background: var(--accent); color: #fff; }
+.ph-btn:disabled { opacity: .35; }
+
+/* Einfahrende Panels (überdecken das Feld nur teilweise) */
+html.phone #ph-panels {
+  display: block; position: fixed; z-index: 29;
+  top: calc(env(safe-area-inset-top) + 6px); bottom: calc(env(safe-area-inset-bottom) + 6px);
+  right: calc(64px + env(safe-area-inset-right)); width: min(300px, 58vw);
+  background: var(--panel); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow);
+  transform: translateX(calc(100% + 80px)); transition: transform .22s ease; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+html.phone #ph-panels.open { transform: none; }
+.ph-panel { display: none; flex-direction: column; min-height: 0; flex: 1; }
+.ph-panel.active { display: flex; }
+.ph-panel header { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 4px 14px; border-bottom: 1px solid var(--border); }
+.ph-body { overflow-y: auto; padding: 8px; flex: 1; min-height: 0; overscroll-behavior: contain; }
+.ph-body > .group { flex-wrap: wrap; margin-bottom: 8px; }
+.ph-body .group.colors { gap: 0; }
+.ph-body .pal-sec { margin-bottom: 10px; }
+.ph-body .pal-grid { grid-template-columns: repeat(3, 1fr); }
+.ph-body .teams { grid-template-columns: 1fr 1fr; }
+.ph-body .token { width: 64px; height: 64px; }
+.ph-body .token svg { width: 50px; height: 50px; }
+/* Mehr-Panel: Buttons als Zeilen mit Beschriftung */
+.ph-panel[data-name="mehr"] .ph-body { display: flex; flex-direction: column; gap: 2px; }
+.ph-panel[data-name="mehr"] .ph-body .btn { justify-content: flex-start; width: 100%; gap: 12px; padding: 0 10px; text-align: left; }
+.ph-panel[data-name="mehr"] .ph-body .btn:not(.board-name)::after { content: attr(aria-label); font-size: 15px; font-weight: 600; text-align: left; }
+.ph-panel[data-name="mehr"] .ph-body .board-name { max-width: none; font-weight: 800; background: var(--panel2) !important; text-align: left; padding: 0 12px; }
+/* Seiten-Panel: senkrechte Liste */
+.ph-body #pagebar { display: flex; flex-direction: column; height: auto; padding: 0; border: 0; background: transparent; gap: 8px; }
+.ph-body .pages { flex-direction: column; height: auto; max-height: calc(100dvh - 150px); overflow-y: auto; padding: 4px 0; align-items: stretch; }
+.ph-body .thumb { width: 100%; }
+.ph-body .thumb-svg { height: 84px; }
+.ph-body .add-page { width: 100%; height: 48px; }
+
+/* Feld-Bedienelemente kompakter */
+html.phone #zoombar { left: 6px; bottom: 6px; padding: 2px; gap: 0; border-radius: 12px; }
+html.phone #zoombar .btn { min-width: 44px; height: 44px; }
+html.phone #trash { right: 6px; bottom: 6px; width: 48px; height: 48px; }
+html.phone #rotpanel { left: 60px; bottom: 6px; }
+html.phone #rotpanel input { width: min(220px, 40vw); }
+html.phone #hint, html.phone #notes-tab, html.phone #stats-tab { display: none; }
+html.phone #club-logo { width: 72px; top: 6px; right: 6px; border-radius: 6px; }
+html.phone #selbar { top: 4px; max-width: calc(100% - 90px); left: calc(50% - 20px); }
+html.phone #notes { top: 6px; bottom: 6px; right: 6px; width: min(300px, 60%); }
+html.phone #anim-note { top: 6px; font-size: 15px; max-width: calc(100% - 120px); }
+html.phone .modal-back { padding: 6px; }
+html.phone .modal { max-height: calc(100dvh - 12px); }
+
+/* Animation: kompakte Leiste unten (eine Zeile, waagerecht scrollbar) */
+html.phone #animbar {
+  left: 56px; right: 60px; bottom: 4px; padding: 3px; gap: 3px; border-radius: 14px;
+  flex-direction: row; overflow-x: auto; scrollbar-width: none; touch-action: pan-x;
+}
+html.phone #animbar::-webkit-scrollbar { display: none; }
+html.phone .anim-row { flex: none; gap: 3px; }
+html.phone #animbar .sep, html.phone #animbar .step-lbl, html.phone #animbar .sel-lbl { display: none; }
+html.phone .step-chips { flex: none; max-width: 34vw; }
+html.phone .note-in { flex: none; width: 170px !important; }
+html.phone #stage-wrap.anim #stage { height: calc(100% - 56px); }
+html.phone #stage-wrap.anim #zoombar, html.phone #stage-wrap.anim #trash { bottom: 60px; }
+html.phone #stage-wrap.anim #rotpanel { bottom: 60px; }
+html.phone #stage-wrap.anim #notes { bottom: 60px; }
+
+/* Handy im Hochformat: nur Hinweis zum Drehen */
+@media (orientation: portrait) and (max-width: 499px) {
+  #rotate-hint {
+    display: flex; position: fixed; inset: 0; z-index: 500; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; background: var(--bg); color: var(--text); text-align: center; padding: 24px;
+  }
+  .rh-ic svg { width: 72px; height: 72px; color: var(--accent); animation: rh-turn 2.4s ease-in-out infinite; }
+  .rh-t { font-size: 22px; font-weight: 800; }
+  .rh-s { color: var(--muted); }
+  @keyframes rh-turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+}

@@ -3,6 +3,7 @@ import { state, set, on } from '../store.js';
 import { lib, POS_NUMS, roleName, setPosition, resetPositions, DEFAULT_POSITIONS, ACTION_CATS, updateAction, addAction, deleteAction, resetActions, libChanged } from '../library.js';
 import { modal, confirmDlg } from './dialogs.js';
 import { MONTHS } from '../alltime.js';
+import { openHofSettings } from './hof.js';
 import { openBoardSettings } from '../kader.js';
 
 /** Menüpunkt „Einstellungen“ */
@@ -39,6 +40,9 @@ export function openSettings() {
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Statistik-Aktionen'), h('div', { class: 'muted small' }, 'Umbenennen, hinzufügen, deaktivieren')),
         h('button', { class: 'btn text', onclick: openActions }, 'Öffnen')),
+      h('div', { class: 'set-row' },
+        h('div', {}, h('b', {}, 'Hall of Fame'), h('div', { class: 'muted small' }, 'Kategorien, Sprüche, Wall of Shame, Mindestwerte')),
+        h('button', { class: 'btn text', onclick: openHofSettings }, 'Öffnen')),
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Positionen anpassen'), h('div', { class: 'muted small' }, 'Standardpunkte verschieben und Rollen umbenennen')),
         h('button', { class: 'btn text', onclick: openPositions }, 'Öffnen'))),

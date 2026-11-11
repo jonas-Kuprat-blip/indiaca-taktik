@@ -5,6 +5,7 @@ import { state, on, set, setTool, undo, redo, canUndo, canRedo, board, page, ren
 import { promptText, colorPicker } from './dialogs.js';
 import { openBoardManager } from './boards.js';
 import { openStats } from './stats.js';
+import { openHof } from './hof.js';
 import { openRoster } from './roster.js';
 import { openSettings } from './settings.js';
 import { openSquads } from './squads.js';
@@ -60,6 +61,7 @@ export function initToolbar(root) {
   const notesBtn = btn(I.notes, 'Notizen', () => set({ notesOpen: !state.notesOpen }));
   const statsBtn = btn(I.stats, 'Statistik (Live, Nachtrag, Spiel)', () => openStats());
   const rotBtn = btn(I.rotate, 'Feld kippen (hoch/quer)', () => setOrientation(pageOrientation() === 'quer' ? 'hoch' : 'quer'));
+  const hofBtn = btn(I.trophy, 'Hall of Fame', () => openHof());
   const rosterBtn = btn(I.person, 'Spieler', openRoster);
   const squadsBtn = btn(I.team, 'Mannschaften', openSquads);
   const settingsBtn = btn(I.gear, 'Einstellungen', openSettings);
@@ -72,7 +74,7 @@ export function initToolbar(root) {
     h('div', { class: 'group colors' }, colorBtns, customBtn), h('div', { class: 'sep' }),
     widthGroup,
     h('div', { class: 'spacer' }),
-    palmBtn, undoBtn, redoBtn, rotBtn, notesBtn, statsBtn, rosterBtn, squadsBtn, settingsBtn, themeBtn
+    palmBtn, undoBtn, redoBtn, rotBtn, notesBtn, statsBtn, hofBtn, rosterBtn, squadsBtn, settingsBtn, themeBtn
   );
 
   const update = () => {

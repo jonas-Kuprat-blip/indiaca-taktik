@@ -123,7 +123,7 @@ function enter() {
   move(sec('spieler'), panels.spieler); // Standardfiguren
   move(sec('kader'), panels.spieler); // Kader + Aufstellung einsetzen
   move(document.getElementById('pagebar'), panels.seiten);
-  for (const l of ['Boards verwalten', 'Board umbenennen', 'Wiederholen', 'Feld kippen', 'Notizen', 'Statistik', 'Spieler', 'Mannschaften', 'Einstellungen', 'Nur Stift', 'Theme']) move(l === 'Board umbenennen' ? tb.querySelector('.board-name') : byLabel(l), panels.mehr);
+  for (const l of ['Boards verwalten', 'Board umbenennen', 'Wiederholen', 'Feld kippen', 'Notizen', 'Statistik', 'Hall of Fame', 'Spieler', 'Mannschaften', 'Einstellungen', 'Nur Stift', 'Theme']) move(l === 'Board umbenennen' ? tb.querySelector('.board-name') : byLabel(l), panels.mehr);
   sync();
   emit('board');
   emit('page');

@@ -86,11 +86,11 @@ export function openProfile(pid, { onEdit } = {}) {
           h('span', { class: 'pg-main' }, h('b', {}, g.opp ? 'vs ' + g.opp : g.b.name), h('span', { class: 'muted small' }, `${fmtDate(g.date)} · ${compLabel(g.comp)} · Sätze ${g.won}:${g.lost}${g.pos ? ' · Pos. ' + g.pos : ''}`)),
           h('span', { class: 'grade ' + gradeClass(g.grade) }, gradeText(g.grade)))));
 
-    body.replaceChildren(head, filterBar(f, render), kpis, qs,
+    body.replaceChildren(...[head, filterBar(f, render), kpis, qs,
       h('h3', {}, 'Verlauf'), chart(s.games),
       h('h3', {}, 'Aktionen'), h('div', { class: 'tbl-wrap' }, table),
       h('h3', {}, 'Einsätze pro Position'), posBars,
-      h('h3', {}, `Spiele (${s.n})`), list);
+      h('h3', {}, `Spiele (${s.n})`), list].filter(Boolean));
   };
   const go = (boardId) => {
     openBoard(boardId);

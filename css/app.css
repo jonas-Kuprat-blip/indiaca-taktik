@@ -444,6 +444,56 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 .seg-sm .seg-btn.pos.active { background: #16a34a; } .seg-sm .seg-btn.neg.active { background: #dc2626; } .seg-sm .seg-btn.neu.active { background: #64748b; }
 .act-add { margin-top: 4px; }
 
+/* ---------- Spielerprofil ---------- */
+.prof { display: flex; flex-direction: column; gap: 12px; }
+.prof h3 { margin: 8px 0 0; }
+.prof-head { display: flex; align-items: center; gap: 12px; }
+.ros-badge.big { width: 52px; height: 52px; font-size: 18px; }
+.prof-name { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.prof-name b { font-size: 20px; }
+.prof-empty { padding: 16px; border-radius: 14px; background: var(--panel2); }
+.flt-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.flt { display: flex; flex-direction: column; gap: 2px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.flt select { min-width: 150px; height: 44px; text-transform: none; letter-spacing: 0; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.kpi { display: flex; flex-direction: column; padding: 10px 12px; border-radius: 14px; background: var(--panel2); }
+.kpi b { font-size: 26px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.kpi > span:not(.muted) { font-weight: 700; font-size: 13px; }
+.kpi.pos b { color: #16a34a; } .kpi.neg b { color: #dc2626; }
+.tbl-wrap { overflow-x: auto; }
+.prof-tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.prof-tbl th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 4px 8px; }
+.prof-tbl td { padding: 6px 8px; border-top: 1px solid var(--border); }
+.prof-tbl .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.prof-tbl .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.linkish { border: 0; background: none; color: var(--accent); font-weight: 600; padding: 6px 0; min-height: 36px; cursor: pointer; text-align: left; }
+.pos-bars { display: flex; flex-direction: column; gap: 6px; }
+.pb { display: grid; grid-template-columns: 170px 1fr 36px; align-items: center; gap: 8px; font-size: 13px; }
+.pb-t { height: 14px; border-radius: 4px; background: var(--panel2); overflow: hidden; }
+.pb-f { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--accent); }
+.pb-n { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+.prof-games { display: flex; flex-direction: column; gap: 4px; }
+.pg-row { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 10px; border-radius: 12px; border: 0; background: var(--panel2); color: var(--text); text-align: left; cursor: pointer; }
+.pg-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.pg-res { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; background: var(--border); }
+.pg-res.win { background: #16a34a; color: #fff; } .pg-res.loss { background: #dc2626; color: #fff; }
+.chart-box { display: flex; flex-direction: column; gap: 6px; }
+.chart-top { display: flex; align-items: center; gap: 10px; }
+.chart-top select { width: auto; height: 40px; }
+.chart { width: 100%; max-height: 200px; }
+.ch-grid { stroke: var(--border); stroke-width: 1; }
+.ch-base { stroke: var(--muted); stroke-width: 1; }
+.ch-ax { fill: var(--muted); font-size: 11px; }
+.ch-ax.sm { font-size: 9px; }
+.ch-val { fill: var(--text); font-size: 11px; font-weight: 700; }
+.ch-bar { fill: var(--accent); }
+.ch-dot { fill: var(--accent); stroke: var(--panel); stroke-width: 2; }
+.ch-line { fill: none; stroke: var(--accent); stroke-width: 2; }
+.ch-hit { fill: transparent; }
+.ch-hit:hover { fill: color-mix(in srgb, var(--text) 6%, transparent); }
+.ros-arch summary { cursor: pointer; color: var(--muted); padding: 10px 0; font-weight: 600; min-height: 44px; }
+.ros-row.arch { opacity: .75; }
+
 /* ---------- Kleine Bildschirme ---------- */
 @media (max-width: 820px) {
   #main { grid-template-columns: 100px minmax(0, 1fr) 0; }
@@ -662,3 +712,6 @@ html.phone .act-row .seg-sm:nth-of-type(2) { grid-column: 1 / 2; }
 html.phone .set-chip { height: 44px; min-width: 48px; }
 html.phone .lv-h .btn { width: 44px; height: 44px; min-width: 44px; }
 html.phone .st-cur .score-num { font-size: 24px; }
+html.phone .pb { grid-template-columns: 120px 1fr 30px; }
+html.phone .flt select { min-width: 120px; }
+html.phone .kpi b { font-size: 22px; }

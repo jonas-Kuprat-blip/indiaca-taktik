@@ -1,7 +1,8 @@
 import { h, NS, clamp } from '../util.js';
 import { state, set, on } from '../store.js';
-import { lib, POS_NUMS, roleName, setPosition, resetPositions, DEFAULT_POSITIONS, ACTION_CATS, updateAction, addAction, deleteAction, resetActions } from '../library.js';
+import { lib, POS_NUMS, roleName, setPosition, resetPositions, DEFAULT_POSITIONS, ACTION_CATS, updateAction, addAction, deleteAction, resetActions, libChanged } from '../library.js';
 import { modal, confirmDlg } from './dialogs.js';
+import { MONTHS } from '../alltime.js';
 import { openBoardSettings } from '../kader.js';
 
 /** Menüpunkt „Einstellungen“ */
@@ -18,6 +19,8 @@ export function openSettings() {
     fillToggle.classList.toggle('on', state.fillTemplates !== false);
     fillToggle.setAttribute('aria-checked', String(state.fillTemplates !== false));
   };
+  const season = h('select', { class: 'input select', 'aria-label': 'Saisonstart', style: { width: 'auto' } }, MONTHS.map((mn, i) => h('option', { value: i + 1, selected: lib.seasonStart === i + 1 }, mn)));
+  season.onchange = () => { lib.seasonStart = +season.value; libChanged(); };
   modal({
     title: 'Einstellungen',
     body: h('div', { class: 'form' },
@@ -30,6 +33,9 @@ export function openSettings() {
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Board-Einstellungen'), h('div', { class: 'muted small' }, 'Mannschaft, Gegner, Seite, Feld, Name')),
         h('button', { class: 'btn text', onclick: () => openBoardSettings() }, 'Öffnen')),
+      h('div', { class: 'set-row' },
+        h('div', {}, h('b', {}, 'Saisonstart'), h('div', { class: 'muted small' }, 'Monat, in dem eine neue Saison beginnt (für Filter in Profil und Hall of Fame)')),
+        season),
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Statistik-Aktionen'), h('div', { class: 'muted small' }, 'Umbenennen, hinzufügen, deaktivieren')),
         h('button', { class: 'btn text', onclick: openActions }, 'Öffnen')),

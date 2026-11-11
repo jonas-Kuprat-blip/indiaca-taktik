@@ -4,6 +4,7 @@ import { on } from '../store.js';
 import { lib, POS_NUMS, roleName, initials, addPlayer, updatePlayer, deletePlayer, sortedRoster, playerById } from '../library.js';
 import { modal, confirmDlg, choose } from './dialogs.js';
 import { playerHasStats, purgePlayerStats } from '../gamestats.js';
+import { openProfile } from './profile.js';
 
 /** Menüpunkt „Spieler“: Spielerkartei (app-weit, für alle Boards) */
 export function openRoster() {
@@ -17,12 +18,20 @@ export function openRoster() {
         ? list.map((p) =>
             h('div', { class: 'ros-row' },
               h('span', { class: 'ros-badge' }, p.kuerzel || '?'),
-              h('button', { class: 'ros-main', onclick: () => editPlayer(p.id) },
+              h('button', { class: 'ros-main', onclick: () => openProfile(p.id, { onEdit: editPlayer }) },
                 h('b', {}, p.name),
                 h('span', { class: 'muted small' }, [p.nummer !== '' && p.nummer != null ? `#${p.nummer}` : null, p.stdPos ? `Pos. ${p.stdPos} · ${roleName(p.stdPos)}` : 'keine Standardposition'].filter(Boolean).join(' · '))),
               h('button', { class: 'btn', 'aria-label': `${p.name} bearbeiten`, html: I.edit, onclick: () => editPlayer(p.id) }),
               h('button', { class: 'btn danger-ic', 'aria-label': `${p.name} löschen`, html: I.trash, onclick: () => removePlayer(p.id) })))
-        : [h('p', { class: 'muted' }, lib.roster.length ? 'Kein Spieler gefunden.' : 'Noch keine Spieler angelegt. Tippe auf „+ Spieler“.')])
+        : [h('p', { class: 'muted' }, lib.roster.length ? 'Kein Spieler gefunden.' : 'Noch keine Spieler angelegt. Tippe auf „+ Spieler“.')]),
+      ...(lib.archived.length
+        ? [h('details', { class: 'ros-arch' },
+            h('summary', {}, `Archivierte Spieler (${lib.archived.length})`),
+            sortedRoster(lib.archived).filter((p) => !q || p.name.toLowerCase().includes(q)).map((p) =>
+              h('div', { class: 'ros-row arch' },
+                h('span', { class: 'ros-badge' }, p.kuerzel || '?'),
+                h('button', { class: 'ros-main', onclick: () => openProfile(p.id) }, h('b', {}, p.name), h('span', { class: 'muted small' }, 'gelöscht · Stats archiviert')))))]
+        : [])
     );
   };
   search.addEventListener('input', render);
@@ -32,7 +41,7 @@ export function openRoster() {
     body: h('div', { class: 'ros' },
       h('div', { class: 'ros-top' }, search, h('button', { class: 'btn text primary', onclick: () => editPlayer(null) }, '+ Spieler')),
       listEl,
-      h('p', { class: 'muted small' }, 'Die Kartei gilt für alle Boards. Namensänderungen werden auf allen Seiten übernommen.')),
+      h('p', { class: 'muted small' }, 'Spieler antippen: Profil mit All-Time-Stats. Die Kartei gilt für alle Boards; Namensänderungen werden überall übernommen.')),
   });
   render();
   on('library', () => document.body.contains(m.box) && render());

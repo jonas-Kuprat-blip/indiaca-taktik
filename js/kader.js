@@ -1,11 +1,12 @@
 import { h, clone } from './util.js';
 import { FIELDS, clampPlayer } from './model.js';
-import { state, emit, board, page, commit, touch, select, createBoard, renameBoard, setFieldType, pageFromTemplate } from './store.js';
+import { state, emit, board, page, commit, touch, select, createBoard, openBoard, renameBoard, setFieldType, pageFromTemplate } from './store.js';
 import {
   lib, POS_NUMS, roleName, roleOfPos, posToModel, sideOf, playerById, sortedRoster, squadById, squadPlayers,
   sortedSquads, defaultLineup, lineupById,
 } from './library.js';
 import { modal, choose, toast } from './ui/dialogs.js';
+import { openStats } from './ui/stats.js';
 
 /*
  * Board-Mannschaft, Kader und Platzierung von Kartei-Spielern.
@@ -277,10 +278,14 @@ export function openBoardSettings(b = board()) {
         h('label', { class: 'form-row' }, h('span', {}, 'Gegner-Mannschaft'), op)),
       h('div', { class: 'form-row' }, h('span', {}, 'Seite der eigenen Mannschaft (Querformat)'), side),
       !b.squadId && !b.oppSquadId ? h('div', { class: 'form-row' }, h('span', {}, 'Kartei-Spieler ohne Mannschaft stehen als'), rt) : null,
+      h('div', { class: 'set-row' },
+        h('div', {}, h('b', {}, 'Spiel-Infos & Statistik'), h('div', { class: 'muted small' }, b.game?.isGame ? 'Als Spiel markiert' : 'Datum, Gegner, Wettbewerb, Ergebnis')),
+        h('button', { class: 'btn text', onclick: () => { if (b.id !== state.boardId) openBoard(b.id); m.close(); openStats('spiel'); } }, 'Öffnen')),
       h('p', { class: 'muted small' }, 'Die Mannschaft gilt für alle Seiten dieses Boards. Beim Seitenwechsel wird das Board gespiegelt.'));
   };
+  let m;
   render();
-  modal({ title: 'Board-Einstellungen', body, actions: [{ label: 'Fertig', primary: true }] });
+  m = modal({ title: 'Board-Einstellungen', body, actions: [{ label: 'Fertig', primary: true }] });
 }
 
 /** Neues Board: Name, Feld, Mannschaft(en), optional direkt mit Aufstellung */

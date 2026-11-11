@@ -58,7 +58,7 @@ export function initToolbar(root) {
   const undoBtn = btn(I.undo, 'Rückgängig', undo);
   const redoBtn = btn(I.redo, 'Wiederholen', redo);
   const notesBtn = btn(I.notes, 'Notizen', () => set({ notesOpen: !state.notesOpen }));
-  const statsBtn = btn(I.stats, 'Statistik (Fehlangabe, Abwehr, Angriff)', openStats);
+  const statsBtn = btn(I.stats, 'Statistik (Live, Nachtrag, Spiel)', () => openStats());
   const rotBtn = btn(I.rotate, 'Feld kippen (hoch/quer)', () => setOrientation(pageOrientation() === 'quer' ? 'hoch' : 'quer'));
   const rosterBtn = btn(I.person, 'Spieler', openRoster);
   const squadsBtn = btn(I.team, 'Mannschaften', openSquads);

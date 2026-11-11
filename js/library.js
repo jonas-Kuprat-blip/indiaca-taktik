@@ -24,7 +24,45 @@ export const DEFAULT_POSITIONS = {
 };
 export const POS_NUMS = [1, 2, 3, 4, 5];
 
-export const lib = { roster: [], squads: [], positions: clone(DEFAULT_POSITIONS) };
+/*
+ * Statistik-Aktionen (app-weit). sign: +1 positiv · −1 negativ · 0 neutral (für Quoten/Hall of Fame)
+ * pt: Wirkung auf den Spielstand bei Live-Erfassung (+1 Punkt für uns, −1 Punkt für den Gegner, 0 keiner)
+ */
+export const ACTION_CATS = [
+  ['angabe', 'Angabe'], ['angriff', 'Angriff'], ['block', 'Block'], ['annahme', 'Annahme'],
+  ['abwehr', 'Abwehr'], ['zuspiel', 'Zuspiel'], ['fehler', 'Fehler'],
+];
+export const DEFAULT_ACTIONS = [
+  { id: 'ass', cat: 'angabe', label: 'Ass', sign: 1, pt: 1 },
+  { id: 'angabe', cat: 'angabe', label: 'Angabe ins Feld', sign: 0, pt: 0 },
+  { id: 'angabefehler', cat: 'angabe', label: 'Angabefehler', sign: -1, pt: -1 },
+  { id: 'angriffspunkt', cat: 'angriff', label: 'Angriffspunkt', sign: 1, pt: 1 },
+  { id: 'angriff', cat: 'angriff', label: 'Angriff im Spiel', sign: 0, pt: 0 },
+  { id: 'angriffsfehler', cat: 'angriff', label: 'Angriffsfehler', sign: -1, pt: -1 },
+  { id: 'blockout', cat: 'angriff', label: 'Blockout', sign: 1, pt: 1 },
+  { id: 'blockpunkt', cat: 'block', label: 'Blockpunkt', sign: 1, pt: 1 },
+  { id: 'annahme_gut', cat: 'annahme', label: 'Gute Annahme', sign: 1, pt: 0 },
+  { id: 'annahmefehler', cat: 'annahme', label: 'Annahmefehler', sign: -1, pt: -1 },
+  { id: 'abwehr_gut', cat: 'abwehr', label: 'Gute Abwehr', sign: 1, pt: 0 },
+  { id: 'zuspiel_perf', cat: 'zuspiel', label: 'Perfektes Zuspiel', sign: 1, pt: 0 },
+  { id: 'netzfehler', cat: 'fehler', label: 'Netzfehler', sign: -1, pt: -1 },
+  { id: 'uebertreten', cat: 'fehler', label: 'Übertreten', sign: -1, pt: -1 },
+  { id: 'fehler_sonst', cat: 'fehler', label: 'Sonstiger Fehler', sign: -1, pt: -1 },
+];
+const CAT_IDS = ACTION_CATS.map(([c]) => c);
+const normAction = (a, builtin) => ({
+  id: a.id, cat: CAT_IDS.includes(a.cat) ? a.cat : 'fehler', label: String(a.label || 'Aktion').trim() || 'Aktion',
+  sign: [1, 0, -1].includes(+a.sign) ? +a.sign : 0, pt: [1, 0, -1].includes(+a.pt) ? +a.pt : 0,
+  active: a.active !== false, builtin: !!builtin,
+});
+function normActions(list) {
+  const src = Array.isArray(list) ? list.filter((a) => a?.id) : [];
+  const out = DEFAULT_ACTIONS.map((d) => normAction({ ...d, ...(src.find((a) => a.id === d.id) || {}), id: d.id }, true));
+  for (const a of src) if (!DEFAULT_ACTIONS.some((d) => d.id === a.id)) out.push(normAction(a, false));
+  return out;
+}
+
+export const lib = { roster: [], squads: [], positions: clone(DEFAULT_POSITIONS), archived: [], actions: normActions(), seasonStart: 8, hof: null };
 
 export async function loadLibrary() {
   const d = await db.getMeta('library');
@@ -33,6 +71,10 @@ export async function loadLibrary() {
 function applyLibrary(d) {
   lib.roster = Array.isArray(d.roster) ? d.roster.filter((p) => p?.id && p.name).map(normPlayer) : [];
   lib.squads = Array.isArray(d.squads) ? d.squads.filter((s) => s?.id).map(normSquad) : [];
+  lib.archived = Array.isArray(d.archived) ? d.archived.filter((p) => p?.id && p.name).map(normPlayer) : [];
+  lib.actions = normActions(d.actions);
+  lib.seasonStart = d.seasonStart >= 1 && d.seasonStart <= 12 ? +d.seasonStart : 8;
+  lib.hof = d.hof && typeof d.hof === 'object' ? d.hof : null;
   lib.positions = clone(DEFAULT_POSITIONS);
   for (const n of POS_NUMS) {
     const p = d.positions?.[n];
@@ -55,6 +97,30 @@ const save = debounce(() => db.setMeta('library', clone(lib)), 300);
 export function libChanged() {
   save();
   emit('library');
+}
+
+// ---------- Aktionen ----------
+export const actionById = (id) => lib.actions.find((a) => a.id === id);
+export const activeActions = () => lib.actions.filter((a) => a.active);
+export function updateAction(id, patch) {
+  const a = actionById(id);
+  if (!a) return;
+  Object.assign(a, normAction({ ...a, ...patch, id }, a.builtin));
+  libChanged();
+}
+export function addAction(data) {
+  const a = normAction({ ...data, id: 'x_' + uid() }, false);
+  lib.actions.push(a);
+  libChanged();
+  return a;
+}
+export function deleteAction(id) {
+  lib.actions = lib.actions.filter((a) => a.id !== id || a.builtin);
+  libChanged();
+}
+export function resetActions() {
+  lib.actions = normActions(lib.actions.filter((a) => !a.builtin));
+  libChanged();
 }
 
 // ---------- Positionen ----------
@@ -91,6 +157,8 @@ export function initials(name = '') {
   return (w[0][0] + w[w.length - 1][0]).toUpperCase();
 }
 export const playerById = (id) => lib.roster.find((p) => p.id === id);
+/** Auch archivierte (gelöschte, Stats behalten) Spieler */
+export const anyPlayer = (id) => playerById(id) || lib.archived.find((p) => p.id === id);
 export const sortedRoster = (list = lib.roster) => [...list].sort((a, b) => a.name.localeCompare(b.name, 'de'));
 
 export function addPlayer(data) {
@@ -110,14 +178,17 @@ export function updatePlayer(id, patch) {
   });
   libChanged();
 }
-export function deletePlayer(id) {
+export function deletePlayer(id, { archive = false } = {}) {
+  const pl = playerById(id);
+  if (archive && pl && !lib.archived.some((x) => x.id === id)) lib.archived.push({ ...clone(pl), archivedAt: Date.now() });
   lib.roster = lib.roster.filter((p) => p.id !== id);
   for (const s of lib.squads) {
     s.spielerIds = s.spielerIds.filter((x) => x !== id);
     for (const a of s.aufstellungen) for (const n of POS_NUMS) if (a.slots[n] === id) a.slots[n] = null;
   }
-  // Bestehende Figuren bleiben als normale Figur erhalten (Name bleibt stehen)
-  forEachFigure((e) => e.rosterId === id, (e) => {
+  // Bestehende Figuren bleiben als normale Figur erhalten (Name bleibt stehen).
+  // Beim Archivieren bleibt die Verknüpfung, damit die Statistik dem Spieler zugeordnet bleibt.
+  if (!archive) forEachFigure((e) => e.rosterId === id, (e) => {
     delete e.rosterId;
     delete e.short;
   });
@@ -229,13 +300,24 @@ export function importLibrary(d) {
   if (!d || typeof d !== 'object') return { np: 0, ns: 0 };
   const cur = clone(lib);
   applyLibrary(d);
-  const incoming = { roster: lib.roster, squads: lib.squads, positions: lib.positions };
+  const incoming = { roster: lib.roster, squads: lib.squads, positions: lib.positions, archived: lib.archived };
   // zusammenführen: vorhandene IDs behalten, neue ergänzen
   const roster = [...cur.roster];
   let np = 0, ns = 0;
   for (const p of incoming.roster) if (!roster.some((x) => x.id === p.id)) { roster.push(p); np++; }
   const squads = [...cur.squads];
   for (const s of incoming.squads) if (!squads.some((x) => x.id === s.id)) { squads.push(s); ns++; }
+  const archived = [...(cur.archived || [])];
+  for (const p of incoming.archived || []) if (!archived.some((x) => x.id === p.id) && !roster.some((x) => x.id === p.id)) archived.push(p);
+  // eigene Aktionen ergänzen (vorhandene Namen/Einstellungen bleiben)
+  const actions = [...cur.actions];
+  for (const a of lib.actions) if (!actions.some((x) => x.id === a.id)) actions.push(a);
+  const hof = cur.hof || lib.hof;
+  if (cur.hof && lib.hof?.cats) for (const c of lib.hof.cats) if (!cur.hof.cats?.some((x) => x.id === c.id)) (cur.hof.cats ||= []).push(c);
+  lib.archived = archived;
+  lib.actions = actions;
+  lib.hof = hof;
+  lib.seasonStart = cur.seasonStart;
   lib.roster = roster;
   lib.squads = squads;
   lib.positions = cur.positions; // eigene Positionen nicht überschreiben

@@ -2,7 +2,8 @@ import { h } from '../util.js';
 import { I } from '../icons.js';
 import { on } from '../store.js';
 import { lib, POS_NUMS, roleName, initials, addPlayer, updatePlayer, deletePlayer, sortedRoster, playerById } from '../library.js';
-import { modal, confirmDlg } from './dialogs.js';
+import { modal, confirmDlg, choose } from './dialogs.js';
+import { playerHasStats, purgePlayerStats } from '../gamestats.js';
 
 /** Menüpunkt „Spieler“: Spielerkartei (app-weit, für alle Boards) */
 export function openRoster() {
@@ -39,6 +40,16 @@ export function openRoster() {
 
 async function removePlayer(id) {
   const p = playerById(id);
+  if (playerHasStats(id)) {
+    const r = await choose(`${p.name} löschen?`, 'Der Spieler hat Statistik-Einträge. Was soll damit passieren? Figuren auf dem Feld bleiben als normale Figuren stehen.', [
+      { id: 'keep', label: 'Stats behalten (archivieren)', sub: 'zählt weiter in Hall of Fame und Spielstatistik', primary: true },
+      { id: 'del', label: 'Stats ebenfalls löschen', sub: 'alle Einträge in allen Boards entfernen', danger: true },
+    ]);
+    if (!r) return;
+    if (r === 'del') purgePlayerStats(id);
+    deletePlayer(id, { archive: r === 'keep' });
+    return;
+  }
   if (await confirmDlg('Spieler löschen?', `„${p.name}“ wird aus der Kartei und allen Mannschaften entfernt. Figuren auf dem Feld bleiben als normale Figuren stehen.`, { okLabel: 'Löschen', danger: true }))
     deletePlayer(id);
 }

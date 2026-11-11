@@ -1,6 +1,6 @@
 import { h, NS, clamp } from '../util.js';
-import { state, set } from '../store.js';
-import { lib, POS_NUMS, roleName, setPosition, resetPositions, DEFAULT_POSITIONS } from '../library.js';
+import { state, set, on } from '../store.js';
+import { lib, POS_NUMS, roleName, setPosition, resetPositions, DEFAULT_POSITIONS, ACTION_CATS, updateAction, addAction, deleteAction, resetActions } from '../library.js';
 import { modal, confirmDlg } from './dialogs.js';
 import { openBoardSettings } from '../kader.js';
 
@@ -30,6 +30,9 @@ export function openSettings() {
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Board-Einstellungen'), h('div', { class: 'muted small' }, 'Mannschaft, Gegner, Seite, Feld, Name')),
         h('button', { class: 'btn text', onclick: () => openBoardSettings() }, 'Öffnen')),
+      h('div', { class: 'set-row' },
+        h('div', {}, h('b', {}, 'Statistik-Aktionen'), h('div', { class: 'muted small' }, 'Umbenennen, hinzufügen, deaktivieren')),
+        h('button', { class: 'btn text', onclick: openActions }, 'Öffnen')),
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Positionen anpassen'), h('div', { class: 'muted small' }, 'Standardpunkte verschieben und Rollen umbenennen')),
         h('button', { class: 'btn text', onclick: openPositions }, 'Öffnen'))),
@@ -106,4 +109,44 @@ export function openPositions() {
       { label: 'Fertig', primary: true },
     ],
   });
+}
+
+/** Statistik-Aktionen verwalten */
+export function openActions() {
+  const box = h('div', { class: 'act-ed' });
+  const seg = (val, opts, onPick, label) =>
+    h('div', { class: 'seg seg-sm', role: 'group', 'aria-label': label },
+      opts.map(([v, l, cls]) => h('button', { class: 'seg-btn ' + (cls || '') + (val === v ? ' active' : ''), onclick: () => onPick(v) }, l)));
+  const render = () => {
+    box.replaceChildren(...ACTION_CATS.map(([cat, catLabel]) => {
+      const list = lib.actions.filter((a) => a.cat === cat);
+      return h('div', { class: 'act-cat' },
+        h('h3', {}, catLabel),
+        ...list.map((a) => {
+          const name = h('input', { class: 'input', value: a.label, 'aria-label': 'Name der Aktion' });
+          name.addEventListener('change', () => updateAction(a.id, { label: name.value.trim() || a.label }));
+          const sw = h('button', { class: 'switch' + (a.active ? ' on' : ''), role: 'switch', 'aria-checked': String(a.active), 'aria-label': `${a.label} aktiv`, onclick: () => updateAction(a.id, { active: !a.active }) }, h('span'));
+          return h('div', { class: 'act-row' + (a.active ? '' : ' off') },
+            name,
+            seg(a.sign, [[1, '+', 'pos'], [0, '○', 'neu'], [-1, '−', 'neg']], (v) => updateAction(a.id, { sign: v }), 'Wertung'),
+            seg(a.pt, [[1, 'Pkt Wir'], [0, '–'], [-1, 'Pkt Geg']], (v) => updateAction(a.id, { pt: v }), 'Spielstand'),
+            sw,
+            a.builtin ? h('span', { class: 'act-sp' }) : h('button', { class: 'btn danger-ic', 'aria-label': `${a.label} löschen`, html: '✕', onclick: async () => { if (await confirmDlg('Aktion löschen?', `„${a.label}“ wird entfernt. Bereits erfasste Einträge bleiben gespeichert, werden aber nicht mehr angezeigt.`, { okLabel: 'Löschen', danger: true })) deleteAction(a.id); } }));
+        }),
+        h('button', { class: 'btn text act-add', onclick: () => addAction({ cat, label: 'Neue Aktion', sign: 1, pt: 0 }) }, `+ Aktion (${catLabel})`));
+    }));
+  };
+  render();
+  const m = modal({
+    title: 'Statistik-Aktionen',
+    wide: true,
+    body: h('div', {},
+      h('p', { class: 'muted small' }, 'Wertung: + positiv, ○ neutral, − negativ (für Quoten, Noten und Hall of Fame). Spielstand: zählt bei der Live-Erfassung automatisch einen Punkt für uns oder den Gegner. Deaktivierte Aktionen verschwinden aus der Erfassung, alte Einträge bleiben erhalten.'),
+      box),
+    actions: [
+      { label: 'Standard wiederherstellen', danger: true, onClick: async () => { if (await confirmDlg('Standard wiederherstellen?', 'Namen und Einstellungen der Standard-Aktionen werden zurückgesetzt. Eigene Aktionen bleiben.', { okLabel: 'Zurücksetzen', danger: true })) resetActions(); return false; } },
+      { label: 'Fertig', primary: true },
+    ],
+  });
+  on('library', () => document.body.contains(m.box) && render());
 }

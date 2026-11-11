@@ -8,6 +8,7 @@ import { openStats } from './stats.js';
 import { openRoster } from './roster.js';
 import { openSettings } from './settings.js';
 import { openSquads } from './squads.js';
+import { openBoardSettings, boardTitle } from '../kader.js';
 
 const TOOLS = [
   ['select', I.select, 'Auswählen / Verschieben'],
@@ -25,11 +26,8 @@ export function initToolbar(root) {
   const boardsBtn = btn(I.boards, 'Boards verwalten', () => openBoardManager());
   const nameBtn = h('button', {
     class: 'btn text board-name',
-    title: 'Board umbenennen',
-    onclick: async () => {
-      const n = await promptText('Board umbenennen', board().name);
-      if (n) renameBoard(board().id, n);
-    },
+    title: 'Board-Einstellungen',
+    onclick: () => openBoardSettings(),
   });
 
   const toolBtns = TOOLS.map(([t, icon, label]) => {
@@ -80,7 +78,7 @@ export function initToolbar(root) {
   const update = () => {
     const b = board();
     if (!b) return;
-    nameBtn.textContent = b.name;
+    nameBtn.textContent = boardTitle(b);
     toolBtns.forEach((x) => x.classList.toggle('active', x.dataset.tool === state.tool));
     colorBtns.forEach((x) => x.classList.toggle('active', x.dataset.color === state.color));
     customBtn.classList.toggle('active', !COLORS.includes(state.color));
@@ -101,5 +99,5 @@ export function initToolbar(root) {
     else document.documentElement.dataset.theme = state.theme;
     document.getElementById('app').classList.toggle('notes-open', state.notesOpen);
   };
-  on(['ui', 'elements', 'board', 'page', 'notes'], update);
+  on(['ui', 'elements', 'board', 'page', 'notes', 'library', 'boardSquad'], update);
 }

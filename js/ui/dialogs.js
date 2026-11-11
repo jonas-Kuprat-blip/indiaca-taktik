@@ -152,3 +152,24 @@ export function toast(msg) {
   clearTimeout(toastT);
   toastT = setTimeout(() => t.classList.remove('show'), 2200);
 }
+
+/** Auswahl-Dialog mit großen Buttons. options: [{ id, label, sub?, primary?, danger? }] → Promise<id|null> */
+export function choose(title, text, options) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => {
+      if (!done) {
+        done = true;
+        resolve(v);
+      }
+    };
+    let m;
+    const btns = h('div', { class: 'choose' },
+      options.map((o) =>
+        h('button', { class: 'choose-btn' + (o.primary ? ' primary' : '') + (o.danger ? ' danger' : ''), onclick: () => { finish(o.id); m.close(); } },
+          o.big ? h('b', { class: 'big' }, o.big) : null,
+          h('span', { class: 'cl' }, o.label),
+          o.sub ? h('span', { class: 'cs' }, o.sub) : null)));
+    m = modal({ title, body: h('div', {}, text ? h('p', { class: 'muted', style: { marginBottom: '10px' } }, text) : null, btns), actions: [{ label: 'Abbrechen', onClick: () => finish(null) }], onClose: () => finish(null) });
+  });
+}

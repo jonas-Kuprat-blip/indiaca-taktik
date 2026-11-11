@@ -113,14 +113,15 @@ function enter() {
   const tb = document.getElementById('toolbar');
   const groups = tb.querySelectorAll(':scope > .group');
   const byLabel = (l) => tb.querySelector(`button[aria-label^="${l}"]`);
-  const pal = document.querySelectorAll('#palette > .pal-sec');
 
   move(groups[0], panels.stift); // Auswahl, Stift, Pfeil, Radierer
   move(groups[1], panels.stift); // Farben
   move(groups[2], panels.stift); // Strichstärke / gestrichelt
-  move(pal[1], panels.formen); // Ziel / Position (Punkt, Kreuz, Indiaca)
-  move(pal[2], panels.formen); // Zonen
-  move(pal[0], panels.spieler); // Spieler
+  const sec = (n) => document.querySelector(`#palette > .pal-sec[data-sec="${n}"]`);
+  move(sec('ziel'), panels.formen); // Ziel / Position (Punkt, Kreuz, Indiaca)
+  move(sec('zonen'), panels.formen); // Zonen
+  move(sec('spieler'), panels.spieler); // Standardfiguren
+  move(sec('kader'), panels.spieler); // Kader + Aufstellung einsetzen
   move(document.getElementById('pagebar'), panels.seiten);
   for (const l of ['Boards verwalten', 'Board umbenennen', 'Wiederholen', 'Feld kippen', 'Notizen', 'Statistik', 'Spieler', 'Mannschaften', 'Einstellungen', 'Nur Stift', 'Theme']) move(l === 'Board umbenennen' ? tb.querySelector('.board-name') : byLabel(l), panels.mehr);
   sync();

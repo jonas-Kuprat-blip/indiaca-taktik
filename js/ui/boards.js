@@ -5,6 +5,7 @@ import {
   state, on, openBoard, createBoard, renameBoard, duplicateBoard, deleteBoard, setFieldType, exportData, importData, board,
 } from '../store.js';
 import { modal, promptText, confirmDlg, toast } from './dialogs.js';
+import { openNewBoard, openBoardSettings, boardTitle } from '../kader.js';
 
 const fmt = (t) => new Date(t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -25,10 +26,10 @@ export function openBoardManager() {
       ...bs.map((b) =>
         h('div', { class: 'board-row' + (b.id === state.boardId ? ' current' : '') },
           h('button', { class: 'board-open', onclick: () => { openBoard(b.id); m.close(); } },
-            h('div', { class: 'tpl-name' }, b.name),
+            h('div', { class: 'tpl-name' }, boardTitle(b)),
             h('div', { class: 'muted small' }, `${b.pages.length} Seite${b.pages.length === 1 ? '' : 'n'} · ${fmt(b.updatedAt)}`)),
           fieldSelect(b),
-          h('button', { class: 'btn', title: 'Umbenennen', 'aria-label': 'Umbenennen', html: I.edit, onclick: async () => { const n = await promptText('Board umbenennen', b.name); if (n) renameBoard(b.id, n); } }),
+          h('button', { class: 'btn', title: 'Board-Einstellungen', 'aria-label': 'Board-Einstellungen', html: I.gear, onclick: () => openBoardSettings(b) }),
           h('button', { class: 'btn', title: 'Duplizieren', 'aria-label': 'Duplizieren', html: I.copy, onclick: () => duplicateBoard(b.id) }),
           h('button', { class: 'btn', title: 'Exportieren', 'aria-label': 'Exportieren', html: I.download, onclick: () => exportFile([b.id], b.name) }),
           h('button', {
@@ -53,13 +54,7 @@ export function openBoardManager() {
 
   const newBoardBtn = h('button', {
     class: 'btn text primary',
-    onclick: async () => {
-      const n = await promptText('Neues Board', '', { placeholder: 'Name, z. B. Spiel gegen …', okLabel: 'Anlegen' });
-      if (n) {
-        createBoard(n, board()?.fieldType || 'indiaca');
-        m.close();
-      }
-    },
+    onclick: () => openNewBoard(() => m.close()),
   }, '+ Neues Board');
 
   m = modal({

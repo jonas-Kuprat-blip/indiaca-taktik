@@ -2,6 +2,7 @@ import { h, NS, clamp } from '../util.js';
 import { state, set } from '../store.js';
 import { lib, POS_NUMS, roleName, setPosition, resetPositions, DEFAULT_POSITIONS } from '../library.js';
 import { modal, confirmDlg } from './dialogs.js';
+import { openBoardSettings } from '../kader.js';
 
 /** Menüpunkt „Einstellungen“ */
 export function openSettings() {
@@ -17,6 +18,9 @@ export function openSettings() {
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Positionsnummern anzeigen'), h('div', { class: 'muted small' }, 'Kleine Nummer 1–5 an Figuren mit Position')),
         posToggle),
+      h('div', { class: 'set-row' },
+        h('div', {}, h('b', {}, 'Board-Einstellungen'), h('div', { class: 'muted small' }, 'Mannschaft, Gegner, Seite, Feld, Name')),
+        h('button', { class: 'btn text', onclick: () => openBoardSettings() }, 'Öffnen')),
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Positionen anpassen'), h('div', { class: 'muted small' }, 'Standardpunkte verschieben und Rollen umbenennen')),
         h('button', { class: 'btn text', onclick: openPositions }, 'Öffnen'))),

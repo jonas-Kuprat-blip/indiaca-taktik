@@ -12,12 +12,21 @@ export function openSettings() {
     posToggle.classList.toggle('on', state.showPosNumbers);
     posToggle.setAttribute('aria-checked', String(state.showPosNumbers));
   };
+  const fillToggle = h('button', { class: 'switch' + (state.fillTemplates !== false ? ' on' : ''), role: 'switch', 'aria-checked': String(state.fillTemplates !== false) }, h('span'));
+  fillToggle.onclick = () => {
+    set({ fillTemplates: state.fillTemplates === false });
+    fillToggle.classList.toggle('on', state.fillTemplates !== false);
+    fillToggle.setAttribute('aria-checked', String(state.fillTemplates !== false));
+  };
   modal({
     title: 'Einstellungen',
     body: h('div', { class: 'form' },
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Positionsnummern anzeigen'), h('div', { class: 'muted small' }, 'Kleine Nummer 1–5 an Figuren mit Position')),
         posToggle),
+      h('div', { class: 'set-row' },
+        h('div', {}, h('b', {}, 'Vorlagen mit Aufstellung füllen'), h('div', { class: 'muted small' }, 'Beim Laden einer Vorlage die Standard-Aufstellung der Board-Mannschaft einsetzen')),
+        fillToggle),
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Board-Einstellungen'), h('div', { class: 'muted small' }, 'Mannschaft, Gegner, Seite, Feld, Name')),
         h('button', { class: 'btn text', onclick: () => openBoardSettings() }, 'Öffnen')),

@@ -6,6 +6,7 @@ import {
 } from '../store.js';
 import { modal, promptText, confirmDlg, toast } from './dialogs.js';
 import { openNewBoard, openBoardSettings, boardTitle } from '../kader.js';
+import { exportLibrary, importLibrary } from '../library.js';
 
 const fmt = (t) => new Date(t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -45,8 +46,10 @@ export function openBoardManager() {
     fileInput.value = '';
     if (!file) return;
     try {
-      const { nb, nt } = await importData(JSON.parse(await file.text()));
-      toast(`${nb} Board(s) und ${nt} Vorlage(n) importiert`);
+      const data = JSON.parse(await file.text());
+      const lib = importLibrary(data.library); // zuerst, damit Board-Mannschaften gefunden werden
+      const { nb, nt } = await importData(data);
+      toast(`${nb} Board(s), ${nt} Vorlage(n), ${lib.np} Spieler, ${lib.ns} Mannschaft(en) importiert`);
     } catch (err) {
       toast('Import fehlgeschlagen: ' + err.message);
     }
@@ -74,7 +77,8 @@ export function openBoardManager() {
 }
 
 async function exportFile(ids, name) {
-  const json = JSON.stringify(exportData(ids), null, 1);
+  // Kartei, Mannschaften, Aufstellungen und Positionen werden immer mitgespeichert
+  const json = JSON.stringify({ ...exportData(ids), library: exportLibrary() }, null, 1);
   const safe = name.replace(/[^\wäöüÄÖÜß-]+/g, '_').slice(0, 40);
   const filename = `taktik-${safe}-${new Date().toISOString().slice(0, 10)}.json`;
   const file = new File([json], filename, { type: 'application/json' });

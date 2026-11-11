@@ -1,6 +1,6 @@
 import { h, clone } from './util.js';
 import { FIELDS, clampPlayer } from './model.js';
-import { state, emit, board, page, commit, touch, select, createBoard, renameBoard, setFieldType } from './store.js';
+import { state, emit, board, page, commit, touch, select, createBoard, renameBoard, setFieldType, pageFromTemplate } from './store.js';
 import {
   lib, POS_NUMS, roleName, roleOfPos, posToModel, sideOf, playerById, sortedRoster, squadById, squadPlayers,
   sortedSquads, defaultLineup, lineupById,
@@ -177,19 +177,56 @@ export function openInsertLineup() {
   });
 }
 
-/** Board um die Netzmitte spiegeln (wenn die Mannschaft die Feldseite wechselt) */
+/** Element um die Netzmitte spiegeln (Punktspiegelung: links ↔ rechts, Netz bleibt) */
+function mirrorEl(e) {
+  if ('x' in e) { e.x = -e.x; e.y = -e.y; }
+  if (e.points) e.points = e.points.map((q) => [-q[0], -q[1], ...q.slice(2)]);
+  if ('x1' in e) { e.x1 = -e.x1; e.y1 = -e.y1; e.x2 = -e.x2; e.y2 = -e.y2; }
+  if (e.from) e.from = { x: -e.from.x, y: -e.from.y };
+  if (e.type === 'player') e.rot = (((e.rot || 0) + 360) % 360) - 180;
+}
+export function mirrorPage(p) {
+  p.elements.forEach(mirrorEl);
+  for (const s of p.anim?.steps || []) Object.values(s.els || {}).forEach(mirrorEl);
+  return p;
+}
 function mirrorBoard(b) {
-  const m = (e) => {
-    if ('x' in e) { e.x = -e.x; e.y = -e.y; }
-    if (e.points) e.points = e.points.map((q) => [-q[0], -q[1], ...q.slice(2)]);
-    if ('x1' in e) { e.x1 = -e.x1; e.y1 = -e.y1; e.x2 = -e.x2; e.y2 = -e.y2; }
-    if (e.from) e.from = { x: -e.from.x, y: -e.from.y };
-    if (e.type === 'player') e.rot = (((e.rot || 0) + 360) % 360) - 180;
+  b.pages.forEach(mirrorPage);
+}
+
+/**
+ * Vorlage/Animationsvorlage füllen: Figuren mit Position (1–5) werden durch die Spieler der
+ * Standard-Aufstellung der Board-Mannschaft (bzw. Gegner-Mannschaft) ersetzt – in allen Animationsschritten
+ * mit derselben festen ID. Abschaltbar in den Einstellungen.
+ */
+export function fillPageWithLineups(p, b = board()) {
+  if (state.fillTemplates === false) return p;
+  const { own, opp } = boardSquads(b);
+  const plans = [['own', own], ['opp', opp]].map(([t, sq]) => ({ t, sq, lu: defaultLineup(sq) })).filter((x) => x.sq && x.lu);
+  if (!plans.length) return p;
+  const idMap = {}, used = new Set();
+  const apply = (e) => {
+    if (e.type !== 'player' || !e.pos) return e;
+    if (!(e.id in idMap)) {
+      idMap[e.id] = null;
+      const plan = plans.find((x) => x.t === e.team);
+      const pl = plan && playerById(plan.lu.slots[e.pos]);
+      if (pl && !used.has(pl.id)) {
+        used.add(pl.id);
+        idMap[e.id] = { id: figureId(pl.id), rosterId: pl.id, label: pl.name, short: pl.kuerzel, number: pl.nummer || '', color: plan.sq.farbe, role: roleOfPos(e.pos) };
+      }
+    }
+    return idMap[e.id] ? { ...e, ...idMap[e.id] } : e;
   };
-  for (const p of b.pages) {
-    p.elements.forEach(m);
-    for (const s of p.anim?.steps || []) Object.values(s.els || {}).forEach(m);
-  }
+  p.elements = p.elements.map(apply);
+  for (const st of p.anim?.steps || []) st.els = Object.fromEntries(Object.values(st.els || {}).map((e) => { const ne = apply(e); return [ne.id, ne]; }));
+  return p;
+}
+/** Seite aus Vorlage: auf die Feldseite des Boards spiegeln und mit Aufstellung füllen */
+export function pageFromTpl(t, b = board()) {
+  const p = pageFromTemplate(t);
+  if ((t.ownSide || 'left') !== (b.ownSide || 'left')) mirrorPage(p);
+  return fillPageWithLineups(p, b);
 }
 
 const squadOptions = (cur) => [h('option', { value: '' }, '– keine –'), ...sortedSquads().map((s) => h('option', { value: s.id, selected: s.id === cur }, s.name))];

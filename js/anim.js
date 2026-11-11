@@ -1,6 +1,7 @@
 import { h, uid, clone } from './util.js';
 import { I } from './icons.js';
 import { FIELDS, newPage, ensureAnim, ANIM_TYPES } from './model.js';
+import { posToModel, roleOfPos, DEFAULT_POSITIONS } from './library.js';
 import { state, on, emit, board, page, commit, touch, pageOrientation } from './store.js';
 import { renderOne } from './render.js';
 import * as stage from './stage.js';
@@ -354,53 +355,56 @@ function example(name, steps) {
   const mk = (id, [x, y]) => {
     if (id === 'ball') return { id, type: 'marker', symbol: 'indiaca', color: '#dc2626', label: '', size: 1, x, y };
     const team = id[0] === 'o' ? 'opp' : 'own';
-    return { id, type: 'player', team, color: b.teams[team].color, size: 1, label: '', number: '', role: id.endsWith('z') ? 'zuspiel' : 'angriff', x, y };
+    const pos = +id.slice(1);
+    return { id, type: 'player', team, color: b.teams[team].color, size: 1, label: '', number: '', pos, role: roleOfPos(pos), x, y };
   };
   const pg = {
     id: uid(), kind: 'anim', name, notes: '', elements: [],
     anim: { cur: 0, steps: steps.map((s) => ({ id: uid(), dur: 1, note: s.note, ...(s.dur ? { dur: s.dur } : {}), els: Object.fromEntries(Object.entries(s.pos).map(([id, xy]) => [id, mk(id, xy)])) })) },
   };
   load(pg, 0);
-  return { id: 'ex-' + name, name, builtin: true, fieldType: b.fieldType, page: pg };
+  // Beispiele sind für „eigenes Team links“ definiert
+  return { id: 'ex-' + name, name, builtin: true, fieldType: 'indiaca', ownSide: 'left', page: pg };
 }
 
 /*
- * Indiaca-Grundaufstellung: 3 vorne, 2 hinten.
- * Koordinaten in Metern, eigene Hälfte x < 0 (Netz bei x = 0, 3-m-Linie bei x = −3),
- * y < 0 = links, y > 0 = rechts (aus Sicht des eigenen Teams; im Hochformat ist die eigene Hälfte unten).
- *   aa = Außenangreifer (links, 3-m-Linie)   am = Mittelangreifer (Mitte/leicht rechts, 3-m-Linie)
- *   az = Zuspieler (rechts vorne am Netz)    ahl/ahr = Abwehr hinten links/rechts
- * Gegner gespiegelt (o…): aus seiner Sicht dieselbe Aufstellung.
+ * Grundaufstellung nach Positionssystem (Standardpunkte, Indiaca-Feld, eigenes Team links):
+ *   p1 Außenangreifer hinten rechts · p2 1. Zuspieler vorne rechts am Netz · p3 Hauptangreifer Mitte (3-m-Linie)
+ *   p4 2. Zuspieler links (3-m-Linie) · p5 2. Mitte hinten links
+ * Gegner o1–o5 gespiegelt (aus seiner Sicht dieselbe Aufstellung).
+ * Figuren tragen ihre Position → beim Laden in ein Board mit Mannschaft wird die Standard-Aufstellung eingesetzt.
  */
-const OWN = { aa: [-3, -2], am: [-3, 0.5], az: [-0.8, 2.2], ahl: [-6, -1.5], ahr: [-6, 1.5] };
-const OPP = { oa: [3, 2], om: [3, -0.5], oz: [0.8, -2.2], ohl: [6, 1.5], ohr: [6, -1.5] };
+const xy = (n, side) => { const q = posToModel(n, side, 'indiaca', DEFAULT_POSITIONS); return [Math.round(q.x * 100) / 100, Math.round(q.y * 100) / 100]; };
+const OWN = Object.fromEntries([1, 2, 3, 4, 5].map((n) => ['p' + n, xy(n, 'left')]));
+const OPP = Object.fromEntries([1, 2, 3, 4, 5].map((n) => ['o' + n, xy(n, 'right')]));
 const withOpp = (own, opp = {}) => ({ ...OPP, ...opp, ...own });
 
 export function exampleTemplates() {
+  const srv = [8.4, OPP.o1[1]]; // Aufschläger des Gegners hinter seiner Grundlinie (Pos. 1)
   return [
     example('K1: Annahme → Aufbau → Angriff', [
-      { note: 'Grundaufstellung: 3 vorne, 2 hinten – Gegner schlägt auf', pos: withOpp({ ...OWN, ball: [8.6, -1.5] }, { ohr: [8.4, -1.5] }) },
-      { note: 'Annahme hinten links', dur: 1.4, pos: withOpp({ ...OWN, ahl: [-5.7, -1.2], ball: [-5.5, -1.1] }, { ohr: [6, -1.5] }) },
-      { note: 'Pass zum Zuspieler, Außen holt Anlauf', pos: withOpp({ ...OWN, ahl: [-5.4, -1.2], aa: [-3.8, -2.4], am: [-2.6, 0.3], az: [-0.9, 1.8], ball: [-0.6, 1.7] }) },
-      { note: 'Angriff über außen, Rest sichert ab', pos: withOpp({ ...OWN, aa: [-0.7, -2.1], am: [-2.2, -0.4], az: [-1.3, 1.4], ahl: [-4.4, -1.4], ahr: [-4.6, 1.2], ball: [-0.4, -2.1] }) },
-      { note: 'Punkt im gegnerischen Feld', dur: 0.6, pos: withOpp({ ...OWN, aa: [-0.7, -2.1], am: [-2.2, -0.4], az: [-1.3, 1.4], ahl: [-4.4, -1.4], ahr: [-4.6, 1.2], ball: [4.6, 1.8] }) },
+      { note: 'Grundaufstellung – Gegner schlägt auf', pos: withOpp({ ...OWN, ball: [srv[0] + 0.3, srv[1]] }, { o1: srv }) },
+      { note: 'Annahme durch die 2. Mitte (hinten links)', dur: 1.4, pos: withOpp({ ...OWN, p5: [-5.8, -1.3], ball: [-5.5, -1.2] }) },
+      { note: 'Pass zum 1. Zuspieler, Hauptangreifer holt Anlauf', pos: withOpp({ ...OWN, p5: [-5.4, -1.3], p3: [-3.6, 0.3], p2: [-1, 1.9], ball: [-0.7, 1.8] }) },
+      { note: 'Angriff über die Mitte, Rest sichert ab', pos: withOpp({ ...OWN, p3: [-0.7, 0.2], p2: [-1.4, 1.5], p4: [-2.2, -1.2], p1: [-4.2, 1.3], p5: [-4.4, -1.3], ball: [-0.4, 0.2] }) },
+      { note: 'Punkt im gegnerischen Feld', dur: 0.6, pos: withOpp({ ...OWN, p3: [-0.7, 0.2], p2: [-1.4, 1.5], p4: [-2.2, -1.2], p1: [-4.2, 1.3], p5: [-4.4, -1.3], ball: [4.6, -1.6] }) },
     ]),
     example('K2: Grundstellung → Block/Abwehr', [
-      { note: 'Grundstellung: 3 vorne, 2 hinten – Gegner im Aufbau', pos: withOpp({ ...OWN, ball: [0.9, -1.9] }) },
-      { note: 'Gegner stellt nach außen – Block verschiebt nach rechts', pos: withOpp(
-        { aa: [-3.3, -1.6], am: [-1.2, 1.2], az: [-0.6, 2.2], ahl: [-5.6, -1.2], ahr: [-5.4, 2.2], ball: [0.7, 1.9] },
-        { oa: [1.6, 2.2], oz: [0.8, -1.8] }) },
-      { note: 'Doppelblock (Zuspieler + Mitte), Außen und hinten sichern ab', pos: withOpp(
-        { aa: [-3.6, -1.2], am: [-0.4, 1.2], az: [-0.4, 2.1], ahl: [-5.2, -0.6], ahr: [-4.6, 2.5], ball: [-0.2, 1.6] },
-        { oa: [0.5, 2.0], oz: [0.8, -1.8] }) },
-      { note: 'Abwehr hinten links – Gegenangriff kann starten', pos: withOpp(
-        { aa: [-3.6, -1.6], am: [-1.4, 0.8], az: [-0.8, 1.8], ahl: [-5, -0.4], ahr: [-4.6, 2.2], ball: [-4.9, -0.4] },
-        { oa: [1.2, 2.0], oz: [0.8, -1.8] }) },
+      { note: 'Grundstellung – Gegner im Aufbau', pos: withOpp({ ...OWN, ball: [OPP.o2[0], OPP.o2[1] + 0.2] }) },
+      { note: 'Gegner stellt auf die Mitte – Block orientiert sich', pos: withOpp(
+        { ...OWN, p2: [-0.6, 0.9], p3: [-1, -0.4], p4: [-3.4, -2], p5: [-5.4, -1.2], p1: [-5.4, 1.4], ball: [0.8, 0] },
+        { o3: [1.3, 0] }) },
+      { note: 'Doppelblock (1. Zuspieler + Hauptangreifer), hinten sichern ab', pos: withOpp(
+        { ...OWN, p2: [-0.4, 0.5], p3: [-0.4, -0.4], p4: [-3.6, -1.8], p5: [-5.2, -1], p1: [-5, 1.2], ball: [-0.15, 0.1] },
+        { o3: [0.5, 0] }) },
+      { note: 'Abwehr hinten rechts – Gegenangriff kann starten', pos: withOpp(
+        { ...OWN, p2: [-1, 1.6], p3: [-1.6, 0], p4: [-3.4, -1.9], p5: [-5, -1], p1: [-5.1, 1.3], ball: [-5, 1.3] },
+        { o3: [1.2, 0] }) },
     ]),
     example('Angabe → Annahme', [
-      { note: 'Gegner schlägt auf – Grundaufstellung 3 vorne, 2 hinten', pos: withOpp({ ...OWN, ball: [8.6, -1.5] }, { ohr: [8.4, -1.5] }) },
-      { note: 'Annahme hinten rechts, Zuspieler bleibt am Netz', dur: 1.4, pos: withOpp({ ...OWN, ahr: [-6.3, 1.8], am: [-3.2, 0.2], ball: [-6.1, 1.8] }, { ohr: [6, -1.5] }) },
-      { note: 'Pass zum Zuspieler', pos: withOpp({ ...OWN, ahr: [-5.8, 1.6], aa: [-3.6, -2.3], am: [-2.8, 0.2], az: [-0.9, 1.9], ball: [-0.6, 1.8] }) },
+      { note: 'Gegner schlägt auf – Grundaufstellung', pos: withOpp({ ...OWN, ball: [srv[0] + 0.3, srv[1]] }, { o1: srv }) },
+      { note: 'Annahme durch den Außenangreifer (hinten rechts)', dur: 1.4, pos: withOpp({ ...OWN, p1: [-6.2, 1.8], ball: [-6, 1.8] }) },
+      { note: 'Pass zum 1. Zuspieler', pos: withOpp({ ...OWN, p1: [-5.8, 1.6], p3: [-3.4, 0.2], p2: [-1, 1.9], ball: [-0.7, 1.8] }) },
     ]),
   ];
 }

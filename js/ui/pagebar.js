@@ -7,6 +7,7 @@ import {
 } from '../store.js';
 import { thumbSVG } from '../render.js';
 import { makeAnimPage, exampleTemplates } from '../anim.js';
+import { pageFromTpl } from '../kader.js';
 import { menu, modal, promptText, confirmDlg, toast } from './dialogs.js';
 
 let list;
@@ -137,7 +138,7 @@ export function newPageDialog() {
       ...(ts.length
         ? ts.map((t) =>
             h('div', { class: 'tpl-row' },
-              h('button', { class: 'tpl-open', onclick: pick(() => addPage(pageFromTemplate(t))) },
+              h('button', { class: 'tpl-open', onclick: pick(() => addPage(pageFromTpl(t))) },
                 h('div', { class: 'tpl-thumb', html: thumbSVG(t.page, { ...board(), fieldType: t.fieldType || board().fieldType }) }),
                 h('div', {}, h('div', { class: 'tpl-name' }, t.name), h('div', { class: 'muted small' }, (FIELDS[t.fieldType]?.short || '') + (t.page.kind === 'angabe' ? ' · Angabe' : t.page.kind === 'anim' ? ` · Animation (${t.page.anim?.steps?.length || 1} Schritte)` : '')))),
               h('button', { class: 'btn', 'aria-label': 'Umbenennen', html: I.edit, onclick: async () => { const v = await promptText('Vorlage umbenennen', t.name); if (v) { await renameTemplate(t.id, v); renderTpl(); } } }),
@@ -162,7 +163,7 @@ export function newPageDialog() {
       h('h3', {}, 'Beispiel-Animationen'),
       h('div', { class: 'tpl-list' }, exampleTemplates().map((t) =>
         h('div', { class: 'tpl-row' },
-          h('button', { class: 'tpl-open', onclick: pick(() => addPage(pageFromTemplate(t))) },
+          h('button', { class: 'tpl-open', onclick: pick(() => addPage(pageFromTpl(t))) },
             h('div', { class: 'tpl-thumb', html: thumbSVG(t.page, board()) }),
             h('div', {}, h('div', { class: 'tpl-name' }, t.name), h('div', { class: 'muted small' }, `Animation · ${t.page.anim.steps.length} Schritte`)))))),
       h('h3', {}, 'Eigene Vorlagen'),

@@ -22,7 +22,8 @@ export const state = {
   notesOpen: false,
   theme: 'auto',
   viewLocked: false, // Ansicht eingefroren (kein Zoom/Verschieben/Drehen)
-  showPosNumbers: false, // Positionsnummern 1–5 auf den Figuren
+  showPosNumbers: false,
+  fillTemplates: true, // Vorlagen beim Laden mit Standard-Aufstellung füllen // Positionsnummern 1–5 auf den Figuren
   orientation: 'hoch', // hoch = Netz waagerecht, eigene Hälfte unten | quer
 };
 
@@ -123,7 +124,7 @@ export function touch(b = board()) {
 }
 export const flushNow = () => flush();
 
-const PREF_KEYS = ['color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme', 'orientation', 'viewLocked', 'showPosNumbers'];
+const PREF_KEYS = ['color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme', 'orientation', 'viewLocked', 'showPosNumbers', 'fillTemplates'];
 const savePrefs = debounce(() => {
   const p = {};
   PREF_KEYS.forEach((k) => (p[k] = state[k]));
@@ -356,7 +357,7 @@ export function setHalf(half) {
 
 // ---------- Vorlagen ----------
 export async function saveTemplate(name) {
-  const t = { id: uid(), name, fieldType: board().fieldType, createdAt: Date.now(), page: clone(page()) };
+  const t = { id: uid(), name, fieldType: board().fieldType, ownSide: board().ownSide || 'left', createdAt: Date.now(), page: clone(page()) };
   state.templates.push(t);
   await db.put('templates', t);
   emit('templates');

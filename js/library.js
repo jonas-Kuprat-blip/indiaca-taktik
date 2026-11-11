@@ -138,6 +138,91 @@ export function forEachFigure(match, fn) {
   emit('page');
 }
 
+// ---------- Mannschaften & Aufstellungen ----------
+export const squadById = (id) => lib.squads.find((s) => s.id === id);
+export const sortedSquads = () => [...lib.squads].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+export const squadPlayers = (sq) => sortedRoster(lib.roster.filter((p) => sq?.spielerIds.includes(p.id)));
+export const defaultLineup = (sq) => sq?.aufstellungen.find((a) => a.standard) || sq?.aufstellungen[0] || null;
+const emptySlots = () => Object.fromEntries(POS_NUMS.map((n) => [n, null]));
+
+export function addSquad(data = {}) {
+  const sq = normSquad({ id: uid(), name: data.name || 'Neue Mannschaft', farbe: data.farbe || '#2563eb', spielerIds: [], aufstellungen: [] });
+  lib.squads.push(sq);
+  libChanged();
+  return sq;
+}
+export function updateSquad(id, patch) {
+  const sq = squadById(id);
+  if (!sq) return;
+  Object.assign(sq, patch);
+  libChanged();
+}
+export function deleteSquad(id) {
+  lib.squads = lib.squads.filter((s) => s.id !== id);
+  // Boards, die diese Mannschaft nutzen, behalten ihre Figuren; nur die Zuordnung fällt weg
+  for (const b of state.boards) {
+    let hit = false;
+    if (b.squadId === id) { delete b.squadId; hit = true; }
+    if (b.oppSquadId === id) { delete b.oppSquadId; hit = true; }
+    if (hit) touch(b);
+  }
+  libChanged();
+  emit('board');
+}
+export function setSquadMember(squadId, playerId, member) {
+  const sq = squadById(squadId);
+  if (!sq) return;
+  if (member && !sq.spielerIds.includes(playerId)) sq.spielerIds.push(playerId);
+  if (!member) {
+    sq.spielerIds = sq.spielerIds.filter((x) => x !== playerId);
+    for (const a of sq.aufstellungen) for (const n of POS_NUMS) if (a.slots[n] === playerId) a.slots[n] = null;
+  }
+  libChanged();
+}
+export function addLineup(squadId, name) {
+  const sq = squadById(squadId);
+  const a = { id: uid(), name: name || `Aufstellung ${sq.aufstellungen.length + 1}`, standard: !sq.aufstellungen.length, slots: emptySlots() };
+  sq.aufstellungen.push(a);
+  libChanged();
+  return a;
+}
+export const lineupById = (sq, id) => sq?.aufstellungen.find((a) => a.id === id);
+export function updateLineup(squadId, lineupId, patch) {
+  const a = lineupById(squadById(squadId), lineupId);
+  if (!a) return;
+  Object.assign(a, patch);
+  libChanged();
+}
+/** Spieler auf Position setzen; steht er schon woanders, wird getauscht */
+export function assignSlot(squadId, lineupId, n, playerId) {
+  const a = lineupById(squadById(squadId), lineupId);
+  if (!a) return;
+  const prev = a.slots[n];
+  if (playerId) for (const m of POS_NUMS) if (m !== n && a.slots[m] === playerId) a.slots[m] = prev || null;
+  a.slots[n] = playerId || null;
+  libChanged();
+}
+export function setDefaultLineup(squadId, lineupId) {
+  const sq = squadById(squadId);
+  sq.aufstellungen.forEach((a) => (a.standard = a.id === lineupId));
+  libChanged();
+}
+export function deleteLineup(squadId, lineupId) {
+  const sq = squadById(squadId);
+  const wasDefault = lineupById(sq, lineupId)?.standard;
+  sq.aufstellungen = sq.aufstellungen.filter((a) => a.id !== lineupId);
+  if (wasDefault && sq.aufstellungen[0]) sq.aufstellungen[0].standard = true;
+  libChanged();
+}
+export function duplicateLineup(squadId, lineupId) {
+  const sq = squadById(squadId);
+  const src = lineupById(sq, lineupId);
+  const a = { ...clone(src), id: uid(), name: src.name + ' (Kopie)', standard: false };
+  sq.aufstellungen.push(a);
+  libChanged();
+  return a;
+}
+
 // ---------- Export / Import ----------
 export const exportLibrary = () => clone(lib);
 export function importLibrary(d) {

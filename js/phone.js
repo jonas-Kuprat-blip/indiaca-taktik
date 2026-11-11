@@ -122,7 +122,7 @@ function enter() {
   move(pal[2], panels.formen); // Zonen
   move(pal[0], panels.spieler); // Spieler
   move(document.getElementById('pagebar'), panels.seiten);
-  for (const l of ['Boards verwalten', 'Board umbenennen', 'Wiederholen', 'Feld kippen', 'Notizen', 'Statistik', 'Nur Stift', 'Theme']) move(l === 'Board umbenennen' ? tb.querySelector('.board-name') : byLabel(l), panels.mehr);
+  for (const l of ['Boards verwalten', 'Board umbenennen', 'Wiederholen', 'Feld kippen', 'Notizen', 'Statistik', 'Spieler', 'Mannschaften', 'Einstellungen', 'Nur Stift', 'Theme']) move(l === 'Board umbenennen' ? tb.querySelector('.board-name') : byLabel(l), panels.mehr);
   sync();
   emit('board');
   emit('page');

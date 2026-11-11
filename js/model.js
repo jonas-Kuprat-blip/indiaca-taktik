@@ -40,14 +40,18 @@ export function migrateElement(e) {
   return e;
 }
 
-/** Spieler nur auf der eigenen Feldseite: eigenes Team x < 0, Gegner x > 0 (Modellkoordinaten) */
-export function clampPlayer(el, fieldType) {
+/**
+ * Spieler nur auf der Feldseite seines Teams. ownSide = Seite des eigenen Teams ('left' = x < 0),
+ * der Gegner steht auf der anderen Seite.
+ */
+export function clampPlayer(el, fieldType, ownSide = 'left') {
   const F = FIELDS[fieldType];
   const gap = 0.3 * F.s; // Abstand zum Netz
   const maxX = F.length / 2 + F.margin - 0.35 * F.s;
   const maxY = F.width / 2 + F.margin - 0.35 * F.s;
   const cl = (v, a, b) => Math.max(a, Math.min(b, v));
-  el.x = Math.round((el.team === 'opp' ? cl(el.x, gap, maxX) : cl(el.x, -maxX, -gap)) * 1000) / 1000;
+  const right = (el.team === 'opp') === (ownSide !== 'right');
+  el.x = Math.round((right ? cl(el.x, gap, maxX) : cl(el.x, -maxX, -gap)) * 1000) / 1000;
   el.y = Math.round(cl(el.y, -maxY, maxY) * 1000) / 1000;
   return el;
 }
@@ -87,17 +91,9 @@ export function newBoard(name = 'Neues Board', fieldType = 'indiaca') {
     name,
     fieldType,
     teams: clone(TEAM_DEFAULT),
+    ownSide: 'left',
     pages: [newPage('taktik', 'Seite 1')],
     createdAt: now,
     updatedAt: now,
   };
-}
-
-// Grundpositionen (Anteil der Feldhälfte) für Tap-Platzierung aus der Palette
-const POS = [[0.8, 0.6], [0.8, -0.6], [0.5, 0], [0.2, 0.6], [0.2, -0.6]];
-export function defaultPos(fieldType, team, number) {
-  const f = FIELDS[fieldType];
-  const [fx, fy] = POS[(Math.max(1, number) - 1) % 5];
-  const side = team === 'own' ? -1 : 1;
-  return { x: side * fx * (f.length / 2), y: -side * fy * (f.width / 2) };
 }

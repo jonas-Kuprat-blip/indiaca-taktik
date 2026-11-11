@@ -1,6 +1,6 @@
 // Service Worker: macht die App komplett offline-fähig.
 // Bei jeder Änderung an Dateien VERSION hochzählen, damit alte Caches gelöscht werden.
-const VERSION = 'taktik-v24';
+const VERSION = 'taktik-v25';
 const ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,9 @@ const ASSETS = [
   './js/stage.js',
   './js/anim.js',
   './js/phone.js',
+  './js/library.js',
+  './js/ui/roster.js',
+  './js/ui/settings.js',
   './js/icons.js',
   './js/ui/dialogs.js',
   './js/ui/toolbar.js',

@@ -5,6 +5,8 @@ import { state, on, set, setTool, undo, redo, canUndo, canRedo, board, page, ren
 import { promptText, colorPicker } from './dialogs.js';
 import { openBoardManager } from './boards.js';
 import { openStats } from './stats.js';
+import { openRoster } from './roster.js';
+import { openSettings } from './settings.js';
 
 const TOOLS = [
   ['select', I.select, 'Auswählen / Verschieben'],
@@ -59,6 +61,8 @@ export function initToolbar(root) {
   const notesBtn = btn(I.notes, 'Notizen', () => set({ notesOpen: !state.notesOpen }));
   const statsBtn = btn(I.stats, 'Statistik (Fehlangabe, Abwehr, Angriff)', openStats);
   const rotBtn = btn(I.rotate, 'Feld kippen (hoch/quer)', () => setOrientation(pageOrientation() === 'quer' ? 'hoch' : 'quer'));
+  const rosterBtn = btn(I.person, 'Spieler', openRoster);
+  const settingsBtn = btn(I.gear, 'Einstellungen', openSettings);
   const themeBtn = btn(I.theme, 'Theme', () => set({ theme: THEMES[(THEMES.indexOf(state.theme) + 1) % 3] }));
 
   const widthGroup = h('div', { class: 'group' }, widthBtns, dashBtn);
@@ -68,7 +72,7 @@ export function initToolbar(root) {
     h('div', { class: 'group colors' }, colorBtns, customBtn), h('div', { class: 'sep' }),
     widthGroup,
     h('div', { class: 'spacer' }),
-    palmBtn, undoBtn, redoBtn, rotBtn, notesBtn, statsBtn, themeBtn
+    palmBtn, undoBtn, redoBtn, rotBtn, notesBtn, statsBtn, rosterBtn, settingsBtn, themeBtn
   );
 
   const update = () => {

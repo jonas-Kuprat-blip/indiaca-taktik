@@ -8,6 +8,7 @@ import { initSelectionBar } from './ui/selection.js';
 import { initAnim } from './anim.js';
 import { initStatsTab } from './ui/stats.js';
 import { initPhone } from './phone.js';
+import { loadLibrary } from './library.js';
 
 // iOS: Pinch-Zoom & Doppeltipp-Zoom der Seite unterbinden
 document.addEventListener('gesturestart', (e) => e.preventDefault());
@@ -15,6 +16,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: fals
 
 async function start() {
   await store.init();
+  await loadLibrary();
   const wrap = document.getElementById('stage-wrap');
   initStage(wrap);
   initSelectionBar(wrap);

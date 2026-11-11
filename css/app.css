@@ -364,6 +364,40 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
   .big-opts { grid-template-columns: 1fr; }
 }
 
+/* ---------- Kartei, Einstellungen, Positionen ---------- */
+.pl-short { fill: #fff; font-weight: 800; pointer-events: none; letter-spacing: -.02em; }
+.pl-pos { fill: #fff; stroke: #111827; stroke-width: .025; }
+.pl-pos-t { fill: #111827; font-weight: 900; pointer-events: none; }
+.ros { display: flex; flex-direction: column; gap: 10px; }
+.ros-top { display: flex; gap: 8px; }
+.ros-top .input { flex: 1; }
+.ros-list { display: flex; flex-direction: column; gap: 4px; }
+.ros-row { display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 12px; background: var(--panel2); }
+.ros-badge { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.ros-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border: 0; background: transparent; text-align: left; padding: 4px 6px; min-height: 44px; cursor: pointer; touch-action: manipulation; }
+.ros-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.form { display: flex; flex-direction: column; gap: 12px; }
+.form-row { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.form-row > .input, .form-row > select { color: var(--text); }
+.form-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pos-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pos-btn { min-height: 56px; border-radius: 12px; border: 2px solid var(--border); background: var(--panel2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; touch-action: manipulation; color: var(--text); }
+.pos-btn b { font-size: 20px; } .pos-btn span { font-size: 11px; color: var(--muted); }
+.pos-btn.active { border-color: var(--accent); background: var(--accent); } .pos-btn.active span, .pos-btn.active b { color: #fff; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: 12px; background: var(--panel2); min-height: 56px; }
+.switch { flex: none; width: 52px; height: 32px; border-radius: 16px; border: 0; background: var(--border); position: relative; cursor: pointer; touch-action: manipulation; }
+.switch span { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.switch.on { background: var(--accent); } .switch.on span { transform: translateX(20px); }
+.pe { display: grid; grid-template-columns: minmax(180px, 260px) 1fr; gap: 16px; align-items: start; }
+.pos-editor { width: 100%; height: auto; display: block; border-radius: 10px; touch-action: none; }
+.pe-out { fill: #17396a; } .pe-court { fill: #e8d3b0; } .pe-line { stroke: #fff; stroke-width: .08; fill: none; } .pe-net { stroke: #10243f; stroke-width: .14; }
+.pe-lbl { fill: #cbd5e1; font-weight: 700; }
+.pe-hit { fill: transparent; } .pe-dot { fill: #2563eb; stroke: #fff; stroke-width: .06; } .pe-pt { cursor: grab; } .pe-pt text { fill: #fff; font-weight: 900; pointer-events: none; }
+.pe-names { display: flex; flex-direction: column; gap: 6px; }
+.pe-name { display: flex; align-items: center; gap: 8px; }
+.pe-num { flex: none; width: 32px; height: 32px; border-radius: 50%; background: #2563eb; color: #fff; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+@media (max-width: 600px) { .pe { grid-template-columns: 1fr; } }
+
 /* =====================================================================
    Handy-Layout (Querformat, Höhe < 500 px) – nur unter html.phone aktiv.
    iPad/Desktop sind davon nicht betroffen.
@@ -471,3 +505,8 @@ html.phone #stage-wrap.anim #notes { bottom: 60px; }
   .rh-s { color: var(--muted); }
   @keyframes rh-turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
 }
+
+/* Handy: Menüs/Dialoge als Seitenpanel von rechts */
+html.phone .modal-back { justify-content: flex-end; align-items: stretch; padding: calc(env(safe-area-inset-top) + 6px) calc(64px + env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 6px) 6px; }
+html.phone .modal, html.phone .modal.wide, html.phone .modal.stats-modal { width: min(560px, 100%); max-height: 100%; }
+html.phone .pe { grid-template-columns: 170px 1fr; }

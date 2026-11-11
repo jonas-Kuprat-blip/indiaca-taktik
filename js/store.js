@@ -22,6 +22,7 @@ export const state = {
   notesOpen: false,
   theme: 'auto',
   viewLocked: false, // Ansicht eingefroren (kein Zoom/Verschieben/Drehen)
+  showPosNumbers: false, // Positionsnummern 1–5 auf den Figuren
   orientation: 'hoch', // hoch = Netz waagerecht, eigene Hälfte unten | quer
 };
 
@@ -122,7 +123,7 @@ export function touch(b = board()) {
 }
 export const flushNow = () => flush();
 
-const PREF_KEYS = ['color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme', 'orientation', 'viewLocked'];
+const PREF_KEYS = ['color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme', 'orientation', 'viewLocked', 'showPosNumbers'];
 const savePrefs = debounce(() => {
   const p = {};
   PREF_KEYS.forEach((k) => (p[k] = state[k]));
@@ -176,6 +177,7 @@ export async function init() {
 function normalizeBoard(b) {
   b.fieldType = FIELDS[b.fieldType] ? b.fieldType : 'indiaca';
   b.teams ||= clone(TEAM_DEFAULT);
+  b.ownSide = b.ownSide === 'right' ? 'right' : 'left';
   if (!b.stats || typeof b.stats !== 'object') b.stats = {};
   if (!b.statsTeam || typeof b.statsTeam !== 'object') b.statsTeam = { geschenke: 0 };
   b.name ||= 'Board';

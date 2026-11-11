@@ -3,8 +3,9 @@ const locked = () => state.viewLocked;
 import {
   state, board, page, findEl, commit, snapshot, changed, select, on, emit, set, switchPage, pageIndex, scale, activeServeType, setTool, pageOrientation,
 } from './store.js';
-import { defaultPos, clampPlayer } from './model.js';
-import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox } from './render.js';
+import { clampPlayer } from './model.js';
+import { posToModel, sideOf, roleOfPos } from './library.js';
+import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox, ui as renderUi } from './render.js';
 import { strokePath } from './stroke.js';
 import { I } from './icons.js';
 
@@ -185,8 +186,10 @@ export function initStage(wrap) {
     if (drawnKey !== key()) {
       drawField();
       drawEls();
-    } else drawSel();
+    } else if (renderUi.showPos !== !!state.showPosNumbers) drawEls();
+    else drawSel();
   });
+  on('library', drawEls);
 }
 
 const key = () => `${board().fieldType}|${!!page().half}|${rot()}|${page().id}`;
@@ -225,6 +228,7 @@ export function redraw() {
 }
 
 function drawEls() {
+  renderUi.showPos = !!state.showPosNumbers;
   const pg = frameOverride ? frameOverride() : page();
   gEls.innerHTML = renderElements(pg, board(), rot());
   gGhost.innerHTML = ghostRenderer ? ghostRenderer(rot()) : '';
@@ -254,9 +258,9 @@ function overTrash(cx, cy) {
 }
 
 // ---------- Spieler hinzufügen ----------
-function playerEl(team, number, pt) {
+function playerEl(team, number, pt, extra = {}) {
   const t = board().teams[team];
-  return clampPlayer({ id: uid(), type: 'player', team, number: number == null ? '' : String(number), label: '', color: t.color, x: pt.x, y: pt.y }, board().fieldType);
+  return clampPlayer({ id: uid(), type: 'player', team, number: number == null ? '' : String(number), label: '', color: t.color, x: pt.x, y: pt.y, ...extra }, board().fieldType, board().ownSide);
 }
 export function dropPlayer(team, number, cx, cy) {
   if (!isOverStage(cx, cy)) return false;
@@ -267,10 +271,10 @@ export function dropPlayer(team, number, cx, cy) {
 export function addPlayerDefault(team, number) {
   // nächste freie Grundposition 1–5 für dieses Team
   if (number == null) number = (page().elements.filter((e) => e.type === 'player' && e.team === team).length % 5) + 1;
-  const pt = defaultPos(board().fieldType, team, number);
+  const pt = posToModel(number, sideOf(board(), team), board().fieldType);
   const taken = (q) => page().elements.some((e) => e.type === 'player' && dist(e, q) < 0.4);
   for (let i = 0; i < 6 && taken(pt); i++) pt.y += 0.9 * (pt.y > 0 ? -1 : 1);
-  commit((p) => p.elements.push(playerEl(team, number, pt)));
+  commit((p) => p.elements.push(playerEl(team, number, pt, { pos: number, role: roleOfPos(number) })));
 }
 
 // ---------- Pointer-Logik ----------
@@ -566,7 +570,7 @@ function translate(el, o, dx, dy) {
     case 'player':
       el.x = o.x + dx;
       el.y = o.y + dy;
-      clampPlayer(el, board().fieldType);
+      clampPlayer(el, board().fieldType, board().ownSide);
       break;
     case 'marker':
       el.x = r3(o.x + dx);

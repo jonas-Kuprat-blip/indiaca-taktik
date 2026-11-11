@@ -40,7 +40,7 @@ export function initSelectionBar(wrap) {
         const c = clone(el);
         c.id = uid();
         const d = 0.6 * scale();
-        if (c.type === 'player') { c.y += d; clampPlayer(c, board().fieldType); }
+        if (c.type === 'player') { c.y += d; clampPlayer(c, board().fieldType, board().ownSide); }
         else if ('x' in c) { c.x += d; c.y += d; }
         if (c.points) c.points = c.points.map((q) => [q[0] + d, q[1] + d]);
         if ('x1' in c) { c.x1 += d; c.x2 += d; c.y1 += d; c.y2 += d; }

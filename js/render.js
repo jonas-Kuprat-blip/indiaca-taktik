@@ -4,7 +4,7 @@ import { esc, colorCss } from './util.js';
 
 const f = (n) => Math.round(n * 1000) / 1000;
 /** Zusätzlicher Größenfaktor für Spieler/Marker (Handy-Layout: etwas größer) */
-export const ui = { tokenScale: 1 };
+export const ui = { tokenScale: 1, showPos: false };
 
 /** Sichtbereich in Modellkoordinaten; half = nur eigene Hälfte; rot = 90 → Hochformat (eigene Hälfte unten) */
 export function modelBox(ft, half = false) {
@@ -86,14 +86,22 @@ export function symbolMarkup(symbol, color, s) {
 }
 
 /** Spieler-Symbol: Kopf + Oberkörper, zentriert um (0,0) */
-export function playerIcon(color, s = 1, role) {
+export function playerIcon(color, s = 1, role, short = '', pos = null) {
   const c = colorCss(color);
   const k = (n) => f(n * s);
+  // Kartei-Spieler: Kürzel weiß auf dem Oberkörper
+  const txt = short
+    ? `<text class="pl-short" y="${k(0.2)}" font-size="${k(String(short).length > 2 ? 0.15 : 0.19)}" text-anchor="middle" dominant-baseline="central">${esc(short)}</text>`
+    : '';
+  // Positionsnummer (einblendbar) an der linken Schulter
+  const pn = pos && ui.showPos
+    ? `<circle class="pl-pos" cx="${k(-0.27)}" cy="${k(0.2)}" r="${k(0.13)}"/><text class="pl-pos-t" x="${k(-0.27)}" y="${k(0.205)}" font-size="${k(0.18)}" text-anchor="middle" dominant-baseline="central">${pos}</text>`
+    : '';
   // Zuspieler: kleines gelbes „Z“ an der Schulter
   const badge = role === 'zuspiel'
     ? `<circle class="pl-role" cx="${k(0.27)}" cy="${k(0.2)}" r="${k(0.14)}"/><text class="pl-role-t" x="${k(0.27)}" y="${k(0.205)}" font-size="${k(0.19)}" text-anchor="middle" dominant-baseline="central">Z</text>`
     : '';
-  return badge ? playerBody(c, k) + badge : playerBody(c, k);
+  return playerBody(c, k) + txt + badge + pn;
 }
 function playerBody(c, k) {
   return `<path class="pl-b" d="M${k(-0.33)} ${k(0.37)}C${k(-0.33)} ${k(0.07)} ${k(-0.2)} ${k(-0.01)} 0 ${k(-0.01)}C${k(0.2)} ${k(-0.01)} ${k(0.33)} ${k(0.07)} ${k(0.33)} ${k(0.37)}Z" style="fill:${c}"/>` +
@@ -107,7 +115,7 @@ export function renderOne(el, page, b, rot = 0) {
       const k = (el.size || 1) * ui.tokenScale;
       const R = 0.45 * s * k;
       return `<g class="el pl" data-id="${el.id}" transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}">
-        <circle r="${f(R)}" class="pl-hit"/>${el.rot ? `<g transform="rotate(${f(el.rot)})">${playerIcon(el.color, s * k, el.role)}</g>` : playerIcon(el.color, s * k, el.role)}
+        <circle r="${f(R)}" class="pl-hit"/>${el.rot ? `<g transform="rotate(${f(el.rot)})">${playerIcon(el.color, s * k, el.role, el.short, el.pos)}</g>` : playerIcon(el.color, s * k, el.role, el.short, el.pos)}
         ${el.label ? `<text class="lbl" y="${f(R + 0.28 * s)}" font-size="${f(0.32 * s)}" text-anchor="middle" dominant-baseline="central">${esc(el.label)}</text>` : ''}
       </g>`;
     }

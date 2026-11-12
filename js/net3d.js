@@ -6,7 +6,7 @@ import { netCfg, NET_BAND, ANTENNA, silMarkup, fmtM } from './net.js';
 /*
  * 3D-Perspektive der Netzansicht – eigene, leichte Projektion in SVG (kein WebGL, keine Bibliothek).
  * Welt: X = seitlich ab linker Seitenlinie, Y = Höhe, Z = Tiefe (0 = Netz, + = gegnerische Hälfte, − = eigene).
- * Kamera: Augenhöhe 1,70 m an der eigenen 3-m-Linie, schaut aufs Netz; Schwenk (yaw) per Wischen.
+ * Kamera: frei drehbar (Orbit), Start auf Augenhöhe 1,70 m an der eigenen 3-m-Linie, gerade aufs Netz.
  * Die Daten bleiben 2D (x, Höhe): Marker liegen in der Netzebene, Silhouetten knapp davor bzw. dahinter.
  */
 const EYE = 1.7, NEAR = 0.25, FOCAL = 1;
@@ -17,20 +17,30 @@ const f = (n) => Math.round(n * 10000) / 10000;
 export const SIL_Z = { own: -0.6, opp: 0.9 };
 export const silZ = (e) => (e.team === 'opp' ? SIL_Z.opp : SIL_Z.own);
 
-/** Kamera: dolly ≥ 0 = so viele Meter zurück (und etwas nach oben, leicht nach unten geneigt) – zum Herauszoomen */
-function camera(b, yaw, dolly) {
+/**
+ * Freie Orbit-Kamera: { az (Drehung, rad), el (Neigung, rad; + = von oben), dist (m), tx, ty, tz (Blickziel) }.
+ * Standard: Augenhöhe 1,70 m an der eigenen 3-m-Linie, gerade aufs Netz.
+ */
+export function defaultCam3(b) {
   const F = FIELDS[b.fieldType] || FIELDS.indiaca;
-  const A = F.attack;
-  const pitch = Math.atan2(dolly * 0.45, A + dolly) * 0.9;
-  return {
-    F, x: F.width / 2, y: EYE + dolly * 0.45, z: -A - dolly,
-    cp: Math.cos(pitch), sp: Math.sin(pitch), c: Math.cos(yaw), s: Math.sin(yaw),
-  };
+  return { az: 0, el: 0, dist: F.attack, tx: F.width / 2, ty: EYE, tz: 0 };
+}
+function camera(b, cam) {
+  const F = FIELDS[b.fieldType] || FIELDS.indiaca;
+  const ca = Math.cos(cam.az), sa = Math.sin(cam.az), ce = Math.cos(cam.el), se = Math.sin(cam.el);
+  // Kamera steht „hinter“ dem Ziel entgegen der Blickrichtung
+  const fx = sa * ce, fy = -se, fz = ca * ce;
+  return { F, x: cam.tx - fx * cam.dist, y: cam.ty - fy * cam.dist, z: cam.tz - fz * cam.dist, cp: ce, sp: se, c: ca, s: sa };
+}
+/** Achsen der Kamera (für Verschieben am Bildschirm) */
+export function camAxes(cam) {
+  const ca = Math.cos(cam.az), sa = Math.sin(cam.az), ce = Math.cos(cam.el), se = Math.sin(cam.el);
+  return { right: [ca, 0, -sa], up: [sa * se, ce, ca * se] };
 }
 
 /** Bildpunkt (viewBox-Koordinaten) → Punkt in der senkrechten Ebene Z = z0 (zum Verschieben in 3D) */
-export function unproject3d(b, yaw, dolly, sx, sy, z0) {
-  const { x, y, z, cp, sp, c, s } = camera(b, yaw, dolly);
+export function unproject3d(b, cam, sx, sy, z0) {
+  const { x, y, z, cp, sp, c, s } = camera(b, cam);
   const vx = sx / FOCAL, vy = -sy / FOCAL, vz = 1;
   const dy = vy * cp - vz * sp, z1 = vy * sp + vz * cp;
   const dx = vx * c + z1 * s, dz = -vx * s + z1 * c;
@@ -40,8 +50,8 @@ export function unproject3d(b, yaw, dolly, sx, sy, z0) {
   return { X: x + dx * t, Y: y + dy * t };
 }
 
-export function render3d(pg, b, yaw = 0, dolly = 0) {
-  const { F, x: camX, y: camY, z: camZ, cp, sp, c, s } = camera(b, yaw, dolly);
+export function render3d(pg, b, cam3 = defaultCam3(b)) {
+  const { F, x: camX, y: camY, z: camZ, cp, sp, c, s } = camera(b, cam3);
   const W = F.width, L2 = F.length / 2, A = F.attack, H = netCfg(pg).hoehe;
   const cam = { x: camX, y: camY, z: camZ };
   const view = ([X, Y, Z]) => {
@@ -98,7 +108,11 @@ export function render3d(pg, b, yaw = 0, dolly = 0) {
     if (!g) return '';
     return `<g transform="translate(${f(g.p[0] - el.x * g.k)} ${f(g.p[1])}) scale(${f(g.k)})">${silMarkup(el)}</g>`;
   };
-  s3 += sils.filter((e) => e.team === 'opp').map((e) => silAt(e, SIL_Z.opp)).join('');
+  // Zeichenreihenfolge nach Kamerastandort: Silhouetten auf der anderen Netzseite zuerst (hinter dem Netz)
+  const nearTeam = camZ < 0 ? 'own' : 'opp';
+  const isNear = (e) => (e.team === 'opp' ? 'opp' : 'own') === nearTeam;
+  const byDist = (list) => [...list].sort((a, q) => Math.hypot(q.x - camX, silZ(q) - camZ) - Math.hypot(a.x - camX, silZ(a) - camZ));
+  s3 += byDist(sils.filter((e) => !isNear(e))).map((e) => silAt(e, silZ(e))).join('');
 
   // Netz: Maschen, Band, Pfosten, Antennen
   s3 += poly([[-0.5, H - NET_BAND, 0], [W + 0.5, H - NET_BAND, 0], [W + 0.5, H, 0], [-0.5, H, 0]], 'class="nv3-mesh"');
@@ -133,7 +147,7 @@ export function render3d(pg, b, yaw = 0, dolly = 0) {
     s3 += `<text class="nv3-lbl" x="${f(x + r * 1.4)}" y="${f(y - r * 1.2)}">${t}</text></g>`;
   }
   // eigene Spieler stehen nah vor der Kamera → halbtransparent, damit Marker sichtbar bleiben
-  s3 += `<g style="opacity:.6">${sils.filter((e) => e.team !== 'opp').map((e) => silAt(e, SIL_Z.own)).join('')}</g>`;
+  s3 += `<g style="opacity:.6">${byDist(sils.filter(isNear)).map((e) => silAt(e, silZ(e))).join('')}</g>`;
   return s3;
 }
 

@@ -9,7 +9,7 @@ import { teamRot, assignMissingRoles } from './rotation.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox, ui as renderUi } from './render.js';
 import { strokePath } from './stroke.js';
 import { isNet, netH, netCfg, snapToNet, readoutText, makeSil } from './net.js';
-import { render3d, VIEWBOX_3D, unproject3d, silZ } from './net3d.js';
+import { render3d, VIEWBOX_3D, unproject3d, silZ, defaultCam3, camAxes } from './net3d.js';
 import { FIELDS } from './model.js';
 import { I } from './icons.js';
 
@@ -25,33 +25,44 @@ import { I } from './icons.js';
 
 let gGhost;
 let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar, rotpanel, rotInput, rotLabel, rotBtn, readout, v3;
-let yaw3 = 0;
-// 3D-Ansicht: Zoom/Verschieben über die viewBox (Basis = VIEWBOX_3D)
+// 3D-Ansicht: freie Orbit-Kamera (Ziel, Abstand, Drehung, Neigung) – Bildausschnitt fest (VIEWBOX_3D)
+let cam3 = null;
 const VB3 = VIEWBOX_3D.split(' ').map(Number);
-const Z3_MIN = 0.2, Z3_MAX = 5; // weit heraus (ganze Halle) bis nah heran
-const view3 = { z: 1, cx: VB3[0] + VB3[2] / 2, cy: VB3[1] + VB3[3] / 2 };
-// z < 1: Kamera fährt zurück (Dolly), statt das Bild zu verzerren; z > 1: Bildausschnitt vergrößern
-const dolly3 = () => (view3.z < 1 ? (1 / view3.z - 1) * 4 : 0);
-function applyView3() {
-  if (view3.z <= 1) Object.assign(view3, { cx: VB3[0] + VB3[2] / 2, cy: VB3[1] + VB3[3] / 2 });
-  const zz = Math.max(1, view3.z);
-  const w = VB3[2] / zz, h = VB3[3] / zz;
-  v3?.setAttribute('viewBox', `${view3.cx - w / 2} ${view3.cy - h / 2} ${w} ${h}`);
-}
-function zoom3(factor, at = { x: view3.cx, y: view3.cy }) {
-  const z = Math.max(Z3_MIN, Math.min(Z3_MAX, view3.z * factor));
-  const k = view3.z / z;
-  view3.cx = at.x - (at.x - view3.cx) * k;
-  view3.cy = at.y - (at.y - view3.cy) * k;
-  view3.z = z;
-  applyView3();
+const DIST3 = [0.8, 45];
+const getCam3 = () => (cam3 ||= defaultCam3(board()));
+function zoom3(factor) {
+  const c = getCam3();
+  c.dist = Math.max(DIST3[0], Math.min(DIST3[1], c.dist / factor));
   draw3d();
+}
+/** Bildschirm-Verschiebung (Pixel) → Blickziel verschieben, das Feld „folgt dem Finger“ */
+function pan3(dxPx, dyPx) {
+  const c = getCam3();
+  const k = (VB3[2] / Math.max(1, v3.getBoundingClientRect().width)) * c.dist;
+  const { right, up } = camAxes(c);
+  c.tx -= (right[0] * dxPx - up[0] * dyPx) * k;
+  c.ty -= (right[1] * dxPx - up[1] * dyPx) * k;
+  c.tz -= (right[2] * dxPx - up[2] * dyPx) * k;
+  c.ty = Math.max(-1, Math.min(8, c.ty));
+  draw3d();
+}
+function orbit3(dAz, dEl = 0) {
+  const c = getCam3();
+  c.az = Math.atan2(Math.sin(c.az + dAz), Math.cos(c.az + dAz)); // −π … π
+  c.el = Math.max(-0.25, Math.min(1.45, c.el + dEl));
+  draw3d();
+  syncRot3();
+}
+function syncRot3() {
+  if (!rotInput || !is3d()) return;
+  const deg = Math.round((getCam3().az * 180) / Math.PI);
+  if (document.activeElement !== rotInput) rotInput.value = deg;
+  rotLabel.textContent = deg + '°';
 }
 function reset3() {
-  yaw3 = 0;
-  Object.assign(view3, { z: 1, cx: VB3[0] + VB3[2] / 2, cy: VB3[1] + VB3[3] / 2 });
-  applyView3();
+  cam3 = defaultCam3(board());
   draw3d();
+  syncRot3();
 }
 const is3d = () => v3?.classList.contains('show');
 let linkFrom = null; // Netzansicht: „Linie zu …“ – erster Marker
@@ -143,36 +154,47 @@ export function initStage(wrap) {
   v3.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   const v3hint = document.createElement('div');
   v3hint.id = 'net3d-hint';
-  v3hint.textContent = '3D: Figuren und Marker ziehen · leere Fläche wischen = schwenken · 2 Finger = zoomen · Doppeltipp = zurück';
+  v3hint.textContent = '3D: Figuren ziehen · leere Fläche = verschieben · 2 Finger = zoomen/drehen/neigen · Doppeltipp = zurück';
   wrap.append(v3, v3hint);
-  // 1 Finger: Kamera schwenken · 2 Finger: Zoom + Verschieben · Mausrad: Zoom · Doppeltipp: zurücksetzen
+  // 1 Finger auf leerer Fläche: verschieben · 2 Finger: zoomen, drehen (verdrehen), neigen (gemeinsam hoch/runter)
+  // Maus: Ziehen = verschieben, Shift-/Rechtsklick-Ziehen = drehen/neigen, Mausrad = zoomen · Doppeltipp: zurücksetzen
   const ptrs3 = new Map();
   let g3 = null;
   const vb3 = (cx, cy) => {
     const q = new DOMPoint(cx, cy).matrixTransform(v3.getScreenCTM().inverse());
     return { x: q.x, y: q.y };
   };
+  const two = () => {
+    const [a, b] = [...ptrs3.values()];
+    return { a, b, d: Math.hypot(a.x - b.x, a.y - b.y), ang: Math.atan2(b.y - a.y, b.x - a.x), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+  };
+  const startOne = (p, e) => {
+    const orbit = e && (e.shiftKey || e.button === 2 || e.altKey);
+    g3 = { kind: orbit ? 'orbit' : 'pan', x: p.x, y: p.y };
+  };
+  v3.addEventListener('contextmenu', (e) => e.preventDefault());
   v3.addEventListener('pointerdown', (e) => {
     try { v3.setPointerCapture(e.pointerId); } catch {}
     ptrs3.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    // Figur/Marker antippen oder ziehen (wie in 2D) – sonst schwenken
+    // Figur/Marker antippen oder ziehen (wie in 2D)
     const node = ptrs3.size === 1 && !editLock() ? e.target.closest?.('[data-id]') : null;
     const el = node && findEl(node.dataset.id);
     if (el && (el.type === 'marker' || el.type === 'sil')) {
       const z0 = el.type === 'sil' ? silZ(el) : 0;
       const q = vb3(e.clientX, e.clientY);
-      const w = unproject3d(board(), yaw3, dolly3(), q.x, q.y, z0);
+      const w = unproject3d(board(), getCam3(), q.x, q.y, z0);
       g3 = { kind: 'drag', id: el.id, z0, w0: w, orig: { x: el.x, y: el.y }, cx: e.clientX, cy: e.clientY, moved: false };
       return;
     }
-    if (ptrs3.size === 1) g3 = { kind: 'yaw', x: e.clientX, yaw: yaw3 };
-    else if (ptrs3.size === 2) {
-      const [a, b] = [...ptrs3.values()];
-      g3 = { kind: 'pinch', d: Math.hypot(a.x - b.x, a.y - b.y), m: vb3((a.x + b.x) / 2, (a.y + b.y) / 2), z: view3.z, cx: view3.cx, cy: view3.cy };
+    if (ptrs3.size === 1) startOne({ x: e.clientX, y: e.clientY }, e);
+    else if (ptrs3.size === 2 && g3?.kind !== 'drag') {
+      const t = two();
+      g3 = { kind: 'two', ...t, dist: getCam3().dist };
     }
   });
   v3.addEventListener('pointermove', (e) => {
     if (!ptrs3.has(e.pointerId) || !g3) return;
+    const prev = ptrs3.get(e.pointerId);
     ptrs3.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (g3.kind === 'drag') {
       if (!g3.moved && Math.hypot(e.clientX - g3.cx, e.clientY - g3.cy) < 5) return;
@@ -182,7 +204,7 @@ export function initStage(wrap) {
       }
       const el = findEl(g3.id);
       const q = vb3(e.clientX, e.clientY);
-      const w = unproject3d(board(), yaw3, dolly3(), q.x, q.y, g3.z0);
+      const w = unproject3d(board(), getCam3(), q.x, q.y, g3.z0);
       if (!el || !w || !g3.w0) return;
       el.x = Math.round((g3.orig.x + w.X - g3.w0.X) * 100) / 100;
       if (el.type === 'marker') {
@@ -193,23 +215,20 @@ export function initStage(wrap) {
       changed();
       return;
     }
-    if (g3.kind === 'yaw' && ptrs3.size === 1) {
-      if (state.viewLocked) return;
-      yaw3 = Math.max(-0.45, Math.min(0.45, g3.yaw - (e.clientX - g3.x) / 500));
-      draw3d();
-    } else if (g3.kind === 'pinch' && ptrs3.size >= 2) {
-      if (state.viewLocked) return;
-      const [a, b] = [...ptrs3.values()];
-      const z = Math.max(Z3_MIN, Math.min(Z3_MAX, (g3.z * Math.hypot(a.x - b.x, a.y - b.y)) / (g3.d || 1)));
-      // Punkt unter der Fingermitte bleibt fest; Verschieben folgt der Fingermitte
-      Object.assign(view3, { z, cx: g3.cx, cy: g3.cy });
-      applyView3();
-      draw3d();
-      const m = vb3((a.x + b.x) / 2, (a.y + b.y) / 2);
-      const k = g3.z / z;
-      view3.cx = g3.m.x - (g3.m.x - g3.cx) * k - (m.x - g3.m.x);
-      view3.cy = g3.m.y - (g3.m.y - g3.cy) * k - (m.y - g3.m.y);
-      applyView3();
+    if (state.viewLocked) return;
+    if (ptrs3.size === 1 && (g3.kind === 'pan' || g3.kind === 'orbit')) {
+      const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+      if (g3.kind === 'pan') pan3(dx, dy);
+      else orbit3(-dx / 220, dy / 260);
+    } else if (ptrs3.size >= 2 && g3.kind === 'two') {
+      const t = two();
+      // Zoom über den Fingerabstand, Drehen über die Verdrehung, Neigen über gemeinsames Hoch/Runter
+      getCam3().dist = Math.max(DIST3[0], Math.min(DIST3[1], g3.dist * (g3.d / (t.d || 1))));
+      const dAng = Math.atan2(Math.sin(t.ang - g3.ang), Math.cos(t.ang - g3.ang));
+      const dEl = (t.my - g3.my) / 300;
+      g3.ang = t.ang;
+      g3.my = t.my;
+      orbit3(-dAng, dEl);
     }
   });
   const end3 = (e) => {
@@ -220,17 +239,15 @@ export function initStage(wrap) {
       g3 = null;
       return;
     }
-    if (ptrs3.size === 1) {
-      const [p] = [...ptrs3.values()];
-      g3 = { kind: 'yaw', x: p.x, yaw: yaw3 };
-    } else if (!ptrs3.size) g3 = null;
+    if (ptrs3.size === 1) startOne([...ptrs3.values()][0]);
+    else if (!ptrs3.size) g3 = null;
   };
   v3.addEventListener('pointerup', end3);
   v3.addEventListener('pointercancel', end3);
   v3.addEventListener('wheel', (e) => {
     e.preventDefault();
     if (state.viewLocked) return;
-    zoom3(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)), vb3(e.clientX, e.clientY));
+    zoom3(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)));
   }, { passive: false });
   v3.addEventListener('dblclick', () => reset3());
   trash = document.createElement('div');
@@ -289,9 +306,13 @@ export function initStage(wrap) {
     let d = +rotInput.value;
     const snap = Math.round(d / 90) * 90;
     if (Math.abs(d - snap) <= 3) d = snap;
-    setAngle(d);
+    if (is3d()) {
+      getCam3().az = (d * Math.PI) / 180;
+      rotLabel.textContent = d + '°';
+      draw3d();
+    } else setAngle(d);
   });
-  const zero = zb('Auf 0° stellen', '0°', () => setAngle(0));
+  const zero = zb('Auf 0° stellen', '0°', () => (is3d() ? (getCam3().az = 0, draw3d(), syncRot3()) : setAngle(0)));
   zero.classList.add('small');
   rotpanel.append(rotInput, rotLabel, zero);
   // Vereinslogo fest oben rechts in der Ecke (außerhalb des Feldes)
@@ -342,8 +363,9 @@ function drawField() {
   gWorld.setAttribute('transform', worldTransform(rot()));
   gField.innerHTML = renderField(b, page().half, page());
   // Netzansicht bleibt aufrecht: kein Drehregler
-  if (rotBtn) rotBtn.style.display = net ? 'none' : '';
-  if (net) {
+  const is3dPage = net && netCfg(page()).view === '3d';
+  if (rotBtn) rotBtn.style.display = net && !is3dPage ? 'none' : '';
+  if (net && !is3dPage) {
     rotpanel?.classList.remove('show');
     rotBtn?.classList.remove('active');
     if (Math.abs(camAngle()) > 0.001) resetView();
@@ -375,15 +397,22 @@ export function redraw() {
 }
 
 let raf3 = 0;
+let cam3Page = null;
 function draw3d(pg) {
   const p = page();
   const on3 = !!p && isNet(p) && netCfg(p).view === '3d';
   v3.classList.toggle('show', on3);
   v3.parentElement.classList.toggle('net3d', on3);
   if (!on3) return;
+  if (cam3Page !== p.id) {
+    // jede Seite startet in der Standard-Ansicht
+    cam3Page = p.id;
+    cam3 = null;
+    syncRot3();
+  }
   const src = pg || (frameOverride ? frameOverride() : p);
   cancelAnimationFrame(raf3);
-  raf3 = requestAnimationFrame(() => (v3.innerHTML = render3d(src, board(), yaw3, dolly3())));
+  raf3 = requestAnimationFrame(() => (v3.innerHTML = render3d(src, board(), getCam3())));
 }
 
 function drawEls() {

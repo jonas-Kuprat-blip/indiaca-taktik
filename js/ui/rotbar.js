@@ -1,6 +1,5 @@
 import { h } from '../util.js';
 import { on, board, page } from '../store.js';
-import { FIELDS } from '../model.js';
 import { roleName, POS_NUMS, posOfRole } from '../library.js';
 import { teamRot, teamLaeufer, rotateTeam, setLaeufer, teamPlayers } from '../rotation.js';
 import { boardSquads } from '../kader.js';
@@ -21,12 +20,15 @@ const teamName = (team) => {
 
 export function initRotBar(wrap) {
   const bars = {};
-  for (const team of ['own', 'opp']) {
+  // Gesammelt direkt über dem Schloss (linke Leiste mit Schloss/Zoom): oben Gegner, unten eigenes Team
+  const dock = h('div', { id: 'rotdock' });
+  wrap.append(dock);
+  for (const team of ['opp', 'own']) {
     const back = h('button', { class: 'btn rb-btn', html: ARROW_BACK, 'aria-label': `${teamName(team)} zurück drehen`, title: 'Zurück drehen (Pos. 1 → 2 → 3 …)', onclick: () => turn(team, 1) });
     const lbtn = h('button', { class: 'btn rb-l', 'aria-label': `${teamName(team)} Läufer und Rotation`, title: 'Läufer / um mehrere Positionen drehen', onclick: () => openPop(team, lbtn) });
     const fwd = h('button', { class: 'btn rb-btn', html: ARROW_FWD, 'aria-label': `${teamName(team)} vor drehen`, title: 'Vor drehen (Pos. 2 → 1 …)', onclick: () => turn(team, -1) });
     const el = h('div', { class: 'rotbar', 'data-team': team }, back, lbtn, fwd);
-    wrap.append(el);
+    dock.append(el);
     bars[team] = { el, back, lbtn, fwd };
   }
 
@@ -56,46 +58,35 @@ export function initRotBar(wrap) {
     place(pop, anchor);
   };
 
-  // Bildschirmposition: Mitte der Feldhälfte des Teams (ohne Kamera-Zoom), Leiste an der nächsten Kante
   const layout = () => {
     const b = board(), pg = page();
     if (!b || !pg) return;
-    const svg = wrap.querySelector('#stage');
-    const world = wrap.querySelector('#g-world');
-    const wr = wrap.getBoundingClientRect();
+    const net = pg.kind === 'netz' || (pg.kind === 'anim' && pg.net);
     let any = false;
     for (const team of ['own', 'opp']) {
       const bar = bars[team];
-      const has = teamPlayers(team, pg).length > 0;
-      const L = has ? teamLaeufer(team) : null;
-      const F = FIELDS[b.fieldType];
-      const left = (b.ownSide === 'right') === (team === 'opp');
-      const mx = (left ? -1 : 1) * F.length / 4;
-      let vis = has && !!svg && !!world;
-      if (vis) {
-        // Modell → Ansicht über Basis-Ansicht (svg) und Welt-Drehung, ohne Kamera
-        const wm = world.transform.baseVal.consolidate()?.matrix;
-        const m = DOMMatrix.fromMatrix(svg.getScreenCTM()).multiply(wm ? DOMMatrix.fromMatrix(wm) : new DOMMatrix());
-        const p = new DOMPoint(mx, 0).matrixTransform(m);
-        const x = p.x - wr.left, y = p.y - wr.top;
-        if (x < 0 || x > wr.width || y < 0 || y > wr.height) vis = false; // z. B. Halbfeld-Ansicht
-        else {
-          const bottom = y >= wr.height / 2 - 4;
-          bar.el.classList.toggle('top', !bottom);
-          bar.el.style.left = Math.max(70, Math.min(wr.width - 70, x)) + 'px';
-        }
-      }
+      const vis = !net && teamPlayers(team, pg).length > 0;
+      const L = vis ? teamLaeufer(team) : null;
       bar.el.classList.toggle('show', vis);
       any ||= vis;
-      if (vis) bar.lbtn.replaceChildren(h('b', {}, L ? 'L' + L : 'L?'), h('span', {}, 'Läufer'));
       const nm = teamName(team);
+      const short = boardSquads()[team]?.name || (team === 'own' ? 'Wir' : 'Gegner');
+      if (vis) bar.lbtn.replaceChildren(h('b', {}, L ? 'L' + L : 'L?'), h('span', {}, short.length > 9 ? short.slice(0, 8) + '…' : short));
+      bar.lbtn.title = `${nm}: Läufer / um mehrere Positionen drehen`;
       bar.back.setAttribute('aria-label', `${nm} zurück drehen`);
       bar.fwd.setAttribute('aria-label', `${nm} vor drehen`);
       bar.lbtn.setAttribute('aria-label', `${nm} Läufer ${L ?? ''}`.trim());
       const sq = boardSquads()[team];
       bar.el.style.setProperty('--team', sq?.farbe || b.teams[team].color);
     }
-    wrap.classList.toggle('has-rot', any);
+    dock.classList.toggle('show', any);
+    // direkt über der Zoom-/Schloss-Leiste platzieren (auch wenn diese sich verschiebt, z. B. im Animationsmodus)
+    const zb = wrap.querySelector('#zoombar');
+    if (any && zb) {
+      const wr = wrap.getBoundingClientRect(), zr = zb.getBoundingClientRect();
+      dock.style.left = zr.left - wr.left + 'px';
+      dock.style.bottom = wr.bottom - zr.top + 8 + 'px';
+    }
   };
   on(['elements', 'page', 'board', 'ui', 'boardSquad', 'library'], () => requestAnimationFrame(layout));
   addEventListener('resize', () => requestAnimationFrame(layout));

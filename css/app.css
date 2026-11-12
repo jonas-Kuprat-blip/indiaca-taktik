@@ -534,18 +534,16 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 .hofs-emo { text-align: center; font-size: 22px; }
 .hofs-say { min-height: 90px; resize: vertical; font-family: inherit; -webkit-user-select: text; user-select: text; }
 
-/* ---------- Rotation / Läufer am Feld ---------- */
-.rotbar { position: absolute; bottom: 12px; z-index: 4; display: none; align-items: center; gap: 2px; transform: translateX(-50%);
+/* ---------- Rotation / Läufer: über dem Schloss (linke Leiste) ---------- */
+#rotdock { position: absolute; z-index: 4; display: none; flex-direction: column; gap: 6px; }
+#rotdock.show { display: flex; }
+.rotbar { display: none; align-items: center; gap: 2px;
   background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--team, var(--accent)); border-radius: 14px; padding: 3px; box-shadow: var(--shadow); }
 .rotbar.show { display: flex; }
-.rotbar.top { bottom: auto; top: 12px; }
 .rb-btn { width: 44px; height: 44px; }
-.rb-l { flex-direction: column; gap: 0; min-width: 54px; height: 44px; padding: 0 6px; line-height: 1; background: var(--panel2); }
+.rb-l { flex-direction: column; gap: 0; min-width: 62px; max-width: 74px; height: 44px; padding: 0 4px; line-height: 1.05; background: var(--panel2); }
 .rb-l b { font-size: 17px; font-weight: 900; }
-.rb-l span { font-size: 10px; color: var(--muted); }
-#stage-wrap.has-rot #hint { bottom: 66px; }
-#stage-wrap.anim .rotbar:not(.top) { bottom: 128px; }
-#stage-wrap.anim .rotbar.top { top: 60px; }
+.rb-l span { font-size: 9.5px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rb-pop { min-width: 260px; gap: 4px; padding: 10px; }
 .rb-ph { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .rb-sec { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-top: 6px; }
@@ -865,9 +863,8 @@ html.phone .hof-grid { grid-template-columns: 1fr; }
   html:not(.phone) #toolbar .sep { margin: 0 3px; }
   html:not(.phone) #toolbar .board-name { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; line-height: 44px; }
 }
-html.phone .rotbar { bottom: 6px; padding: 2px; border-radius: 12px; }
-html.phone .rotbar.top { top: 6px; bottom: auto; }
-html.phone #stage-wrap.anim .rotbar:not(.top) { bottom: 60px; }
+html.phone .rotbar { padding: 2px; border-radius: 12px; }
+html.phone #rotdock { gap: 4px; }
 .lu-rot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
 .lu-l { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
 .laeufer-seg .seg-btn { min-width: 52px; height: 44px; }

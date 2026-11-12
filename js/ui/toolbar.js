@@ -96,6 +96,7 @@ export function initToolbar(root) {
     notesBtn.classList.toggle('active', state.notesOpen);
     notesBtn.classList.toggle('has-dot', !!page()?.notes?.trim());
     themeBtn.title = THEME_LABEL[state.theme];
+    rotBtn.disabled = page()?.kind === 'netz';
     rotBtn.title = pageOrientation() === 'quer' ? 'Feld ist quer – tippen zum Hochkant-Kippen' : 'Feld ist hochkant – tippen zum Quer-Kippen';
     if (state.theme === 'auto') delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = state.theme;

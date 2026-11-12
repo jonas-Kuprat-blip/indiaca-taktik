@@ -3,6 +3,8 @@ import { I } from '../icons.js';
 import { COLORS, clampPlayer } from '../model.js';
 import { state, on, findEl, page, board, commit, snapshot, changed, select, scale } from '../store.js';
 import { colorPicker } from './dialogs.js';
+import { isNet, readoutText } from '../net.js';
+import { startLink, linkPending } from '../stage.js';
 
 /** Schwebende Leiste über dem Feld für das ausgewählte Element */
 export function initSelectionBar(wrap) {
@@ -72,7 +74,10 @@ export function initSelectionBar(wrap) {
         const cx = el.vee ? el.points[1][0] : el.points.reduce((a, p) => a + p[0], 0) / el.points.length;
         const cy = el.vee ? el.points[1][1] : el.points.reduce((a, p) => a + p[1], 0) / el.points.length;
         el.points = el.points.map(([x, y]) => [Math.round((cx + (x - cx) * k) * 1000) / 1000, Math.round((cy + (y - cy) * k) * 1000) / 1000]);
-      } else if (el.type === 'arrow') {
+      } else if (el.type === 'link') {
+      parts.push(lbl('Linie'), swatches(el),
+        h('button', { class: 'btn' + (el.dashed !== false ? ' active' : ''), html: I.dash, 'aria-label': 'Gestrichelt', onclick: () => commit(() => (findEl(el.id).dashed = el.dashed === false)) }));
+    } else if (el.type === 'arrow') {
         const mx = (el.x1 + el.x2) / 2, my = (el.y1 + el.y2) / 2;
         el.x1 = mx + (el.x1 - mx) * k; el.y1 = my + (el.y1 - my) * k;
         el.x2 = mx + (el.x2 - mx) * k; el.y2 = my + (el.y2 - my) * k;
@@ -112,7 +117,9 @@ export function initSelectionBar(wrap) {
       parts.push(
         h('button', { class: 'btn' + (el.symbol === 'dot' ? ' active' : ''), html: I.dot, 'aria-label': 'Punkt', onclick: () => commit(() => (findEl(el.id).symbol = 'dot')) }),
         h('button', { class: 'btn' + (el.symbol === 'x' ? ' active' : ''), html: I.x, 'aria-label': 'Kreuz', onclick: () => commit(() => (findEl(el.id).symbol = 'x')) }),
-        h('button', { class: 'btn' + (el.symbol === 'indiaca' ? ' active' : ''), html: I.indiaca, 'aria-label': 'Indiaca', onclick: () => commit(() => (findEl(el.id).symbol = 'indiaca')) }),
+        isNet(p)
+          ? h('button', { class: 'btn' + (el.symbol === 'ring' ? ' active' : ''), html: I.ring, 'aria-label': 'Kreis', onclick: () => commit(() => (findEl(el.id).symbol = 'ring')) })
+          : h('button', { class: 'btn' + (el.symbol === 'indiaca' ? ' active' : ''), html: I.indiaca, 'aria-label': 'Indiaca', onclick: () => commit(() => (findEl(el.id).symbol = 'indiaca')) }),
         lbl('Größe'), slider(el, 'size', '0.5', '2.5', '0.1', 'Größe', 1),
         textInput(el, 'label', 'Beschriftung', 10)
       );
@@ -121,7 +128,11 @@ export function initSelectionBar(wrap) {
         s.onchange = () => commit(() => (findEl(el.id).serveType = s.value));
         parts.push(s);
       } else parts.push(swatches(el));
-      if (el.from) parts.push(h('button', { class: 'btn text small', onclick: () => commit(() => delete findEl(el.id).from) }, 'Pfeil weg'));
+      if (isNet(p)) {
+        parts.push(
+          h('span', { class: 'sel-lbl net-h' }, readoutText(p, board(), el.x, el.y)),
+          h('button', { class: 'btn text small', onclick: () => startLink(el.id) }, 'Linie zu …'));
+      } else if (el.from) parts.push(h('button', { class: 'btn text small', onclick: () => commit(() => delete findEl(el.id).from) }, 'Pfeil weg'));
       else parts.push(h('button', { class: 'btn text small', onclick: () => commit(() => (findEl(el.id).from = { x: el.x - 2 * scale(), y: el.y })) }, '+ Pfeil'));
     } else if (el.type === 'zone') {
       const r = slider(el, 'opacity', '0.1', '0.8', '0.05', 'Deckkraft', 0.3);
@@ -146,8 +157,10 @@ export function initSelectionBar(wrap) {
   const updateHint = () => {
     const p = page();
     let t = '';
-    if (!state.selectionId) {
-      if (state.tool === 'marker') t = 'Tippen: Ziel setzen · Ziehen: Ziel mit Pfeil vom Startpunkt';
+    if (linkPending()) t = 'Zweiten Marker antippen (woanders tippen = abbrechen)';
+    else if (!state.selectionId) {
+      if (state.tool === 'marker' && isNet(p)) t = 'Tippen: Marker setzen · Ziehen: Höhe live einstellen';
+      else if (state.tool === 'marker') t = 'Tippen: Ziel setzen · Ziehen: Ziel mit Pfeil vom Startpunkt';
       else if (state.tool === 'cone') t = 'Vom Spieler aus in Blickrichtung ziehen';
       else if (['rect', 'tri', 'circle', 'free'].includes(state.tool)) t = 'Ziehen, um die Form aufzuziehen';
       else if (state.tool === 'select') t = 'Antippen: auswählen · Ziehen: verschieben · 2 Finger: zoomen';

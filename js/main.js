@@ -9,6 +9,7 @@ import { initAnim } from './anim.js';
 import { initStatsTab } from './ui/stats.js';
 import { initPhone } from './phone.js';
 import { initRotBar } from './ui/rotbar.js';
+import { initNetBar } from './ui/netbar.js';
 import { loadLibrary } from './library.js';
 
 // iOS: Pinch-Zoom & Doppeltipp-Zoom der Seite unterbinden
@@ -27,6 +28,7 @@ async function start() {
   initNotes(document.getElementById('notes'), wrap);
   initStatsTab(wrap);
   initRotBar(wrap);
+  initNetBar(wrap);
   initPagebar(document.getElementById('pagebar'));
   initPhone();
   store.emit('board');

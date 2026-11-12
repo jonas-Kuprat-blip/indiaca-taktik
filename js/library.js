@@ -90,6 +90,7 @@ function applyLibrary(d) {
   lib.actions = normActions(d.actions);
   lib.seasonStart = d.seasonStart >= 1 && d.seasonStart <= 12 ? +d.seasonStart : 8;
   lib.hof = d.hof && typeof d.hof === 'object' ? d.hof : null;
+  lib.netHeights = d.netHeights && typeof d.netHeights === 'object' ? d.netHeights : null;
   lib.positions = clone(DEFAULT_POSITIONS);
   lib.roles = { ...DEFAULT_ROLES };
   for (const n of POS_NUMS) {
@@ -344,6 +345,7 @@ export function importLibrary(d) {
   lib.actions = actions;
   lib.hof = hof;
   lib.seasonStart = cur.seasonStart;
+  lib.netHeights = cur.netHeights || lib.netHeights;
   lib.roster = roster;
   lib.squads = squads;
   lib.positions = cur.positions; // eigene Positionen und Rollennamen nicht überschreiben

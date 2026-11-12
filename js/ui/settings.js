@@ -1,9 +1,10 @@
 import { h, NS, clamp } from '../util.js';
-import { state, set, on } from '../store.js';
+import { state, set, on, emit } from '../store.js';
 import { lib, POS_NUMS, roleName, setPosition, resetPositions, DEFAULT_POSITIONS, ACTION_CATS, setRoleName, updateAction, addAction, deleteAction, resetActions, libChanged } from '../library.js';
 import { modal, confirmDlg } from './dialogs.js';
 import { MONTHS } from '../alltime.js';
 import { openHofSettings } from './hof.js';
+import { NET_PRESETS, netHeights, DEFAULT_NET_HEIGHTS, fmtM } from '../net.js';
 import { openBoardSettings } from '../kader.js';
 
 /** Menüpunkt „Einstellungen“ */
@@ -49,6 +50,9 @@ export function openSettings() {
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Statistik-Aktionen'), h('div', { class: 'muted small' }, 'Umbenennen, hinzufügen, deaktivieren')),
         h('button', { class: 'btn text', onclick: openActions }, 'Öffnen')),
+      h('div', { class: 'set-row' },
+        h('div', {}, h('b', {}, 'Netzhöhen'), h('div', { class: 'muted small' }, 'Voreinstellungen für die Netzansicht: ' + NET_PRESETS.filter(([k]) => k !== 'manuell').map(([k, l]) => `${l} ${fmtM(netHeights()[k])}`).join(' · '))),
+        h('button', { class: 'btn text', onclick: openNetHeights }, 'Ändern')),
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Hall of Fame'), h('div', { class: 'muted small' }, 'Kategorien, Sprüche, Wall of Shame, Mindestwerte')),
         h('button', { class: 'btn text', onclick: openHofSettings }, 'Öffnen')),
@@ -168,4 +172,27 @@ export function openActions() {
     ],
   });
   on('library', () => document.body.contains(m.box) && render());
+}
+
+/** Netzhöhen der Voreinstellungen (Herren, Damen, Mixed, Jugend) */
+export function openNetHeights() {
+  const vals = { ...netHeights() };
+  const rows = NET_PRESETS.filter(([k]) => k !== 'manuell').map(([k, l]) => {
+    const i = h('input', { class: 'input', type: 'text', inputmode: 'decimal', value: String(vals[k]).replace('.', ','), 'aria-label': `Netzhöhe ${l}`, style: { width: '100px' } });
+    i.onchange = () => {
+      const v = parseFloat(i.value.replace(',', '.'));
+      if (v > 0.5 && v < 4) vals[k] = Math.round(v * 100) / 100;
+      i.value = String(vals[k]).replace('.', ',');
+    };
+    return h('div', { class: 'set-row' }, h('b', {}, l), h('label', { class: 'nb-man' }, i, 'm'));
+  });
+  modal({
+    title: 'Netzhöhen',
+    body: h('div', { class: 'form' }, ...rows,
+      h('p', { class: 'muted small' }, 'Vorbelegt nach CVJM-Indiaca-Regeln (seit 11/2018) bzw. IIA: Herren 2,35 · Damen 2,20 · Mixed 2,30 · Jugend 2,25 m (männl. B-Jugend; weibl. Jugend 2,15 m). Gilt für alle Netzansichten mit dieser Voreinstellung.')),
+    actions: [
+      { label: 'Standard', onClick: () => { lib.netHeights = null; libChanged(); emit('page'); } },
+      { label: 'Speichern', primary: true, onClick: () => { lib.netHeights = { ...vals }; libChanged(); emit('page'); } },
+    ],
+  });
 }

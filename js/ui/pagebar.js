@@ -7,6 +7,7 @@ import {
 } from '../store.js';
 import { thumbSVG } from '../render.js';
 import { makeAnimPage, exampleTemplates } from '../anim.js';
+import { makeNetPage } from '../net.js';
 import { pageFromTpl } from '../kader.js';
 import { menu, modal, promptText, confirmDlg, toast } from './dialogs.js';
 
@@ -32,7 +33,7 @@ function renderAll() {
     ...b.pages.map((p) =>
       h('div', { class: 'thumb' + (p.id === state.pageId ? ' active' : ''), 'data-id': p.id },
         h('div', { class: 'thumb-svg', html: thumbSVG(p, b) }),
-        h('div', { class: 'thumb-name' }, p.kind === 'angabe' ? h('span', { class: 'badge' }, 'A') : null, p.kind === 'anim' ? h('span', { class: 'badge anim' }, '▶') : null, p.half ? h('span', { class: 'badge half' }, '½') : null, p.name)))
+        h('div', { class: 'thumb-name' }, p.kind === 'angabe' ? h('span', { class: 'badge' }, 'A') : null, p.kind === 'anim' ? h('span', { class: 'badge anim' }, '▶') : null, p.kind === 'netz' ? h('span', { class: 'badge net', html: I.net, title: 'Netzansicht' }) : null, p.half ? h('span', { class: 'badge half' }, '½') : null, p.name)))
   );
   list.querySelector('.thumb.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
@@ -113,8 +114,8 @@ function pageMenu(anchor) {
     { label: 'Umbenennen', icon: I.edit, onClick: async () => { const v = await promptText('Seite umbenennen', p.name); if (v) renamePage(p.id, v); } },
     { label: 'Duplizieren', icon: I.copy, onClick: copyCurrentPage },
     { label: 'Als Vorlage speichern', icon: I.star, onClick: async () => { const v = await promptText('Name der Vorlage', p.name); if (v) { await saveTemplate(v); toast('Vorlage gespeichert'); } } },
-    { label: pageOrientation(p) === 'quer' ? 'Feld hochkant stellen' : 'Feld quer kippen', icon: I.rotate, onClick: () => setOrientation(pageOrientation(p) === 'quer' ? 'hoch' : 'quer') },
-    { label: p.half ? 'Ganzes Feld zeigen' : 'Nur eigene Feldhälfte', icon: I.half, onClick: () => setHalf(!p.half) },
+    p.kind === 'netz' ? null : { label: pageOrientation(p) === 'quer' ? 'Feld hochkant stellen' : 'Feld quer kippen', icon: I.rotate, onClick: () => setOrientation(pageOrientation(p) === 'quer' ? 'hoch' : 'quer') },
+    p.kind === 'netz' ? null : { label: p.half ? 'Ganzes Feld zeigen' : 'Nur eigene Feldhälfte', icon: I.half, onClick: () => setHalf(!p.half) },
     { label: 'Nach links', icon: I.left, disabled: i === 0, onClick: () => movePage(i, i - 1) },
     { label: 'Nach rechts', icon: I.right, disabled: i === n - 1, onClick: () => movePage(i, i + 1) },
     { label: 'Seite leeren', icon: I.clear, onClick: () => commit((pg) => (pg.elements = [])) },
@@ -159,6 +160,7 @@ export function newPageDialog() {
         opt(I.half, 'Eigene Feldhälfte', 'Nur unsere Hälfte, größer', () => addPage(makePage('taktik', true))),
         opt(I.serve, 'Angabe-Seite', 'Ziele mit Kreuzen', () => addPage(makePage('angabe'))),
         opt(I.anim, 'Animation', 'Spielzug Schritt für Schritt', () => addPage(makeAnimPage())),
+        opt(I.net, 'Netzansicht', 'Blick aufs Netz: Höhen, Treffpunkte', () => addPage(makeNetPage())),
         opt(I.copy, 'Kopie dieser Seite', page().name, copyCurrentPage)),
       h('h3', {}, 'Beispiel-Animationen'),
       h('div', { class: 'tpl-list' }, exampleTemplates().map((t) =>

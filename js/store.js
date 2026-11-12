@@ -191,7 +191,7 @@ function normalizeBoard(b) {
 }
 function normalizePage(p) {
   p.id ||= uid();
-  p.kind = ['angabe', 'anim'].includes(p.kind) ? p.kind : 'taktik';
+  p.kind = ['angabe', 'anim', 'netz'].includes(p.kind) ? p.kind : 'taktik';
   p.name ||= 'Seite';
   p.notes ||= '';
   if (!Array.isArray(p.elements)) p.elements = [];
@@ -200,6 +200,9 @@ function normalizePage(p) {
     migrateElement(e);
   });
   if (p.kind === 'anim') ensureAnim(p);
+  // Linien ohne (beide) Marker entfernen
+  const ids = new Set(p.elements.map((e) => e.id));
+  p.elements = p.elements.filter((e) => e.type !== 'link' || (ids.has(e.a) && ids.has(e.b)));
   return p;
 }
 

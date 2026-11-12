@@ -41,6 +41,8 @@ export const I = {
   team: svg('<circle cx="8" cy="8" r="3"/><circle cx="16.5" cy="8.5" r="2.5"/><path d="M2.5 20c0-3.6 2.4-6 5.5-6s5.5 2.4 5.5 6z"/><path d="M14.5 14.3c.6-.2 1.3-.3 2-.3 2.6 0 4.5 2 4.5 5h-6"/>'),
   circle: svg('<circle cx="12" cy="12" r="8.5"/>'),
   free: svg('<path d="M6 7.5C8.5 3.5 18 3 19.5 8s-2.5 9.5-7 10.5S3 18 3.5 14 4.8 9.5 6 7.5z"/>'),
+  ring: svg('<circle cx="12" cy="12" r="6" stroke-width="2.6"/>'),
+  net: svg('<path d="M3 9h18M3 9v11M21 9v11M3 13h18M3 17h18M7 9v8M11 9v8M15 9v8M19 9v8"/><path d="M3 20h18" stroke-width="2.4"/>'),
   dot: svg('<circle cx="12" cy="12" r="5" fill="currentColor"/>'),
   x: svg('<path d="M6 6l12 12M18 6L6 18" stroke-width="3"/>'),
   trash: svg('<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v5M14 11v5"/>'),

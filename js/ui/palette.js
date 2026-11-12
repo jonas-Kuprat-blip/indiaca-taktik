@@ -5,6 +5,7 @@ import { playerIcon } from '../render.js';
 import { I } from '../icons.js';
 import { state, on, set, setTool, board, page } from '../store.js';
 import { dropPlayer, addPlayerDefault } from '../stage.js';
+import { isNet, DEFAULT_LEGEND, legendLabel } from '../net.js';
 
 export function initPalette(root) {
   // --- Spieler ---
@@ -29,6 +30,22 @@ export function initPalette(root) {
   markerBtns[2].dataset.symbol = 'indiaca';
   markerBtns[0].dataset.symbol = 'dot';
   markerBtns[1].dataset.symbol = 'x';
+
+  // --- Netzansicht: Höhen-Marker ---
+  const netBtns = [
+    toolBtn('marker', I.x, 'Kreuz', () => set({ markerSymbol: 'x' })),
+    toolBtn('marker', I.ring, 'Kreis', () => set({ markerSymbol: 'ring' })),
+    toolBtn('marker', I.dot, 'Punkt', () => set({ markerSymbol: 'dot' })),
+  ];
+  ['x', 'ring', 'dot'].forEach((sy, i) => (netBtns[i].dataset.symbol = sy));
+  const netColors = h('div', { class: 'net-cols' });
+  const renderNetColors = () => {
+    const p = page();
+    if (!p || !isNet(p)) return;
+    netColors.replaceChildren(...Object.keys(DEFAULT_LEGEND).map((c) =>
+      h('button', { class: 'net-col' + (state.color === c ? ' active' : ''), onclick: () => { set({ color: c }); if (state.tool !== 'marker') setTool('marker'); } },
+        h('i', { style: { background: c } }), h('span', {}, legendLabel(p, c) || c))));
+  };
 
   // --- Kader: Kartei-Spieler (je nach Board-Mannschaft) ---
   const kSearch = h('input', { class: 'input sm kader-search', type: 'search', placeholder: 'Suchen …', 'aria-label': 'Kader durchsuchen' });
@@ -61,8 +78,20 @@ export function initPalette(root) {
     h('div', { class: 'pal-sec', 'data-sec': 'spieler' }, h('div', { class: 'pal-h' }, 'Spieler'), h('div', { class: 'teams' }, teamCols.map((c) => c.col))),
     h('div', { class: 'pal-sec', 'data-sec': 'kader' }, h('div', { class: 'pal-h' }, 'Kader'), kSearch, kList, insertBtn),
     h('div', { class: 'pal-sec', 'data-sec': 'ziel' }, h('div', { class: 'pal-h' }, 'Ziel / Position'), h('div', { class: 'pal-grid' }, markerBtns)),
+    h('div', { class: 'pal-sec', 'data-sec': 'netz' }, h('div', { class: 'pal-h' }, 'Höhen-Marker'), h('div', { class: 'pal-grid' }, netBtns), netColors,
+      h('div', { class: 'muted small net-tip' }, 'Tippen setzt, Ziehen zeigt Höhe live.')),
     h('div', { class: 'pal-sec', 'data-sec': 'zonen' }, h('div', { class: 'pal-h' }, 'Zonen'), h('div', { class: 'pal-grid' }, zoneBtns))
   );
+  // Netzansicht: andere Palette (keine Feld-Spieler, keine Feld-Ziele)
+  const secs = (n) => root.querySelector(`.pal-sec[data-sec="${n}"]`) || document.querySelector(`.pal-sec[data-sec="${n}"]`);
+  const syncKind = () => {
+    const net = isNet(page());
+    for (const n of ['spieler', 'kader', 'ziel']) { const el = secs(n); if (el) el.style.display = net ? 'none' : ''; }
+    const ne = secs('netz');
+    if (ne) ne.style.display = net ? '' : 'none';
+    renderNetColors();
+  };
+  on(['page', 'board', 'ui'], syncKind);
   on(['board', 'page', 'elements', 'library', 'boardSquad'], renderKader);
 
   const update = () => {
@@ -71,6 +100,7 @@ export function initPalette(root) {
     for (const c of teamCols) c.token.innerHTML = `<svg viewBox="-0.5 -0.5 1 1" aria-hidden="true">${playerIcon(b.teams[c.team].color, 1.15)}</svg>`;
     zoneBtns.forEach((x) => x.classList.toggle('active', state.tool === x.dataset.tool));
     markerBtns.forEach((x) => x.classList.toggle('active', state.tool === 'marker' && state.markerSymbol === x.dataset.symbol));
+    netBtns.forEach((x) => x.classList.toggle('active', state.tool === 'marker' && state.markerSymbol === x.dataset.symbol));
   };
   on(['ui', 'board', 'page'], update);
 }

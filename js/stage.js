@@ -8,6 +8,7 @@ import { posToModel, sideOf, roleOfPos, roleAtPos } from './library.js';
 import { teamRot, assignMissingRoles } from './rotation.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox, ui as renderUi } from './render.js';
 import { strokePath } from './stroke.js';
+import { isNet, netH, snapToNet, readoutText } from './net.js';
 import { I } from './icons.js';
 
 /*
@@ -21,10 +22,16 @@ import { I } from './icons.js';
  */
 
 let gGhost;
-let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar, rotpanel, rotInput, rotLabel, rotBtn;
+let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar, rotpanel, rotInput, rotLabel, rotBtn, readout;
+let linkFrom = null; // Netzansicht: „Linie zu …“ – erster Marker
+export function startLink(id) {
+  linkFrom = id;
+  emit('ui');
+}
+export const linkPending = () => linkFrom;
 let drawnKey = '';
 const gestures = new Map(); // pointerId → Geste
-const rot = () => (pageOrientation() === 'quer' ? 0 : 90);
+const rot = () => (isNet(page()) || pageOrientation() === 'quer' ? 0 : 90);
 const ONE_SHOT = ['marker', 'arrow', 'rect', 'tri', 'cone', 'circle', 'free'];
 
 // ---------- Kamera (komplexe Zahl m = Zoom·e^(i·Winkel), b = Verschiebung) ----------
@@ -95,6 +102,9 @@ export function initStage(wrap) {
   svg.innerHTML =
     '<defs><clipPath id="vclip"><rect id="vclip-r"/></clipPath></defs>' +
     '<g id="g-cam"><g id="g-world" clip-path="url(#vclip)"><g id="g-field"></g><g id="g-ghost"></g><g id="g-els"></g><g id="g-live"></g><g id="g-sel"></g></g></g>';
+  readout = document.createElement('div');
+  readout.id = 'net-readout';
+  wrap.append(readout);
   trash = document.createElement('div');
   trash.id = 'trash';
   trash.setAttribute('aria-label', 'Zum Löschen hierher ziehen');
@@ -193,17 +203,25 @@ export function initStage(wrap) {
   on('library', drawEls);
 }
 
-const key = () => `${board().fieldType}|${!!page().half}|${rot()}|${page().id}`;
+const key = () => `${board().fieldType}|${!!page().half}|${rot()}|${page().id}|${isNet(page()) ? netH(page()) : ''}`;
 function drawField() {
   const b = board();
   const k = key();
   if (k !== drawnKey) resetView(); // neue Seite / anderes Feld → Ansicht zurücksetzen
   drawnKey = k;
-  svg.setAttribute('viewBox', viewBox(b.fieldType, page().half, rot()));
+  const net = isNet(page());
+  svg.setAttribute('viewBox', viewBox(b.fieldType, page().half, rot(), page()));
   gWorld.setAttribute('transform', worldTransform(rot()));
-  gField.innerHTML = renderField(b, page().half);
+  gField.innerHTML = renderField(b, page().half, page());
+  // Netzansicht bleibt aufrecht: kein Drehregler
+  if (rotBtn) rotBtn.style.display = net ? 'none' : '';
+  if (net) {
+    rotpanel?.classList.remove('show');
+    rotBtn?.classList.remove('active');
+    if (Math.abs(camAngle()) > 0.001) resetView();
+  }
   // Alles außerhalb des Feldbereichs (z. B. gegnerische Hälfte) abschneiden
-  const mb = modelBox(b.fieldType, page().half);
+  const mb = modelBox(b.fieldType, page().half, page());
   const cr = svg.querySelector('#vclip-r');
   cr.setAttribute('x', mb.x0);
   cr.setAttribute('y', mb.y0);
@@ -328,6 +346,19 @@ function down(e) {
   const editLocked = editLock(); // Animation läuft → nur Ansicht bewegen
   const handleNode = editLocked ? null : e.target.closest?.('[data-handle]');
   const elNode = editLocked ? null : e.target.closest?.('#g-els [data-id]');
+  if (linkFrom) {
+    // „Linie zu …“: zweiten Marker antippen
+    const id = elNode?.dataset.id;
+    const target = id && findEl(id);
+    const from = linkFrom;
+    linkFrom = null;
+    if (target?.type === 'marker' && id !== from && findEl(from)) {
+      commit((p) => p.elements.push({ id: uid(), type: 'link', a: from, b: id, color: findEl(from).color, dashed: true }));
+      select(null);
+    }
+    emit('ui');
+    return;
+  }
   let tool = palmMode || editLocked ? 'select' : state.tool;
   // Einmal-Werkzeuge: Tippen auf ein vorhandenes Element verschiebt es, statt etwas Neues zu setzen
   if (elNode && ONE_SHOT.includes(tool)) {
@@ -372,7 +403,7 @@ function down(e) {
       Object.assign(g, { kind: 'zone', shape: tool, end: pt, cx1: e.clientX, cy1: e.clientY, points: [[pt.x, pt.y]] });
       break;
     case 'marker':
-      Object.assign(g, { kind: 'marker', end: pt });
+      Object.assign(g, { kind: 'marker', end: pt, ev: e });
       live(g);
       break;
     default:
@@ -419,6 +450,10 @@ function move(e) {
       const el = findEl(g.id);
       if (!el) return;
       translate(el, g.orig, pt.x - g.start.x, pt.y - g.start.y);
+      if (isNet(page()) && el.type === 'marker') {
+        snapToNet(page(), el);
+        showReadout(e, el.x, el.y);
+      }
       trash.classList.add('show');
       trash.classList.toggle('hot', overTrash(e.clientX, e.clientY));
       changed();
@@ -450,14 +485,28 @@ function move(e) {
     case 'arrow':
     case 'marker':
       g.end = pt;
+      g.ev = e;
       live(g);
       break;
   }
 }
 
+/** Netzansicht: Höhe und seitliche Position live neben dem Finger/Stift anzeigen */
+function showReadout(e, x, y) {
+  const wr = readout.parentElement.getBoundingClientRect();
+  readout.textContent = readoutText(page(), board(), x, y);
+  readout.style.left = Math.min(wr.width - 10, Math.max(10, e.clientX - wr.left)) + 'px';
+  readout.style.top = Math.max(10, e.clientY - wr.top - 70) + 'px';
+  readout.classList.add('show');
+}
+function hideReadout() {
+  readout?.classList.remove('show');
+}
+
 function up(e) {
   const g = gestures.get(e.pointerId);
   if (!g) return;
+  hideReadout();
   gestures.delete(e.pointerId);
   if (g.kind === 'cam2') return endCam2(g);
   const s = scale();
@@ -508,13 +557,18 @@ function up(e) {
     }
     case 'marker': {
       const st = activeServeType();
-      const withArrow = dist(g.start, g.end) > 0.5 * s;
+      const net = isNet(p);
+      const withArrow = !net && dist(g.start, g.end) > 0.5 * s;
       const mk = {
         id: uid(), type: 'marker', symbol: state.markerSymbol, label: '',
         color: st ? st.color : state.color, x: r3(g.end.x), y: r3(g.end.y),
       };
       if (st) mk.serveType = st.id;
       if (withArrow) mk.from = { x: r3(g.start.x), y: r3(g.start.y) };
+      if (net) {
+        mk.y = Math.min(0, mk.y); // nicht unter den Boden
+        snapToNet(p, mk);
+      }
       if (p) commit((pg) => pg.elements.push(mk));
       setTool('select');
       break;
@@ -532,6 +586,7 @@ function cancel(e) {
 
 function abort(id, g) {
   gestures.delete(id);
+  hideReadout();
   trash.classList.remove('show', 'hot');
   svg.classList.remove('panning');
   if (g.kind === 'move' && g.moved) {
@@ -702,7 +757,11 @@ function live(g) {
   } else if (g.kind === 'marker') {
     const st = activeServeType();
     const mk = { id: 'live', type: 'marker', symbol: state.markerSymbol, color: st ? st.color : state.color, x: g.end.x, y: g.end.y };
-    if (dist(g.start, g.end) > 0.5 * s) mk.from = g.start;
+    if (isNet(p)) {
+      mk.y = Math.min(0, mk.y);
+      snapToNet(p, mk);
+      if (g.ev) showReadout(g.ev, mk.x, mk.y);
+    } else if (dist(g.start, g.end) > 0.5 * s) mk.from = g.start;
     out = renderOne(mk, p, b, rot());
   }
   gLive.innerHTML = out;

@@ -1,17 +1,20 @@
 import { FIELDS } from './model.js';
 import { strokePath } from './stroke.js';
 import { esc, colorCss } from './util.js';
+import { isNet, netBox, netViewBox, renderNetField } from './net.js';
 
 const f = (n) => Math.round(n * 1000) / 1000;
 /** Zusätzlicher Größenfaktor für Spieler/Marker (Handy-Layout: etwas größer) */
 export const ui = { tokenScale: 1, showPos: false };
 
 /** Sichtbereich in Modellkoordinaten; half = nur eigene Hälfte; rot = 90 → Hochformat (eigene Hälfte unten) */
-export function modelBox(ft, half = false) {
+export function modelBox(ft, half = false, page = null) {
+  if (isNet(page)) return netBox(ft, page);
   const F = FIELDS[ft], m = F.margin;
   return { x0: -F.length / 2 - m, x1: half ? 0.8 : F.length / 2 + m, y0: -F.width / 2 - m, y1: F.width / 2 + m };
 }
-export function viewBox(ft, half = false, rot = 0) {
+export function viewBox(ft, half = false, rot = 0, page = null) {
+  if (isNet(page)) return netViewBox(ft, page);
   const { x0, x1, y0, y1 } = modelBox(ft, half);
   if (rot) return `${y0} ${-x1} ${y1 - y0} ${x1 - x0}`;
   return `${x0} ${y0} ${x1 - x0} ${y1 - y0}`;
@@ -20,7 +23,8 @@ export function viewBox(ft, half = false, rot = 0) {
 export const worldTransform = (rot) => (rot ? 'rotate(-90)' : '');
 
 // ---------- Feld ----------
-export function renderField(b, half = false) {
+export function renderField(b, half = false, page = null) {
+  if (isNet(page)) return renderNetField(b, page);
   const F = FIELDS[b.fieldType];
   const L = F.length, W = F.width, a = F.attack, m = F.margin;
   const x0 = -L / 2 - m, y0 = -W / 2 - m;
@@ -80,6 +84,8 @@ export function symbolMarkup(symbol, color, s) {
       `<ellipse cx="0" cy="${k(0.22)}" rx="${k(0.17)}" ry="${k(0.07)}" class="ind-p"/>`;
   }
   if (symbol === 'dot') return `<circle r="${f(0.22 * s)}" class="mk-dot" style="fill:${c}"/>`;
+  if (symbol === 'ring')
+    return `<circle r="${f(0.2 * s)}" class="mk-halo" style="fill:none;stroke-width:${f(0.17 * s)}"/><circle r="${f(0.2 * s)}" style="fill:none;stroke:${c};stroke-width:${f(0.08 * s)}"/>`;
   const a = f(0.24 * s);
   const d = `M${-a} ${-a}L${a} ${a}M${-a} ${a}L${a} ${-a}`;
   return `<path d="${d}" class="mk-halo" style="stroke-width:${f(0.2 * s)}"/><path d="${d}" style="stroke:${c};stroke-width:${f(0.11 * s)};stroke-linecap:round"/>`;
@@ -109,7 +115,7 @@ function playerBody(c, k) {
 }
 
 export function renderOne(el, page, b, rot = 0) {
-  const s = FIELDS[b.fieldType].s;
+  const s = FIELDS[b.fieldType].s * (isNet(page) ? 0.55 : 1); // Netzansicht: kleinerer Maßstab-Ausschnitt
   switch (el.type) {
     case 'player': {
       const k = (el.size || 1) * ui.tokenScale;
@@ -137,6 +143,15 @@ export function renderOne(el, page, b, rot = 0) {
       return `<g class="el ar" data-id="${el.id}"><path class="hit" d="M${f(el.x1)} ${f(el.y1)}L${f(el.x2)} ${f(el.y2)}" style="stroke-width:${0.6 * s}"/>${arrowMarkup(
         el.x1, el.y1, el.x2, el.y2, el.color, el.width, el.dashed
       )}</g>`;
+    case 'link': {
+      // Linie zwischen zwei Markern (folgt den Markern, auch in Animationen)
+      const a = page?.elements.find((e) => e.id === el.a), z = page?.elements.find((e) => e.id === el.b);
+      if (!a || !z) return '';
+      const c = colorCss(el.color || a.color || 'ink');
+      const w = 0.05 * s;
+      return `<g class="el lk" data-id="${el.id}"><path class="hit" d="M${f(a.x)} ${f(a.y)}L${f(z.x)} ${f(z.y)}" style="stroke-width:${0.5 * s}"/>` +
+        `<path d="M${f(a.x)} ${f(a.y)}L${f(z.x)} ${f(z.y)}" style="fill:none;stroke:${c};stroke-width:${f(w)};stroke-linecap:round${el.dashed !== false ? `;stroke-dasharray:${f(w * 3)} ${f(w * 2.4)}` : ''}"/></g>`;
+    }
     case 'marker': {
       const c = markerColor(el, page);
       let from = '';
@@ -157,7 +172,7 @@ export function renderOne(el, page, b, rot = 0) {
   return '';
 }
 
-const ORDER = { zone: 0, stroke: 1, arrow: 2, marker: 3, player: 4 };
+const ORDER = { zone: 0, stroke: 1, arrow: 2, link: 2.5, marker: 3, player: 4 };
 export function renderElements(page, b, rot = 0) {
   if (!page) return '';
   const els = [...page.elements].sort((a, c) => (ORDER[a.type] ?? 9) - (ORDER[c.type] ?? 9));
@@ -169,13 +184,17 @@ const handle = (name, x, y, s) =>
   `<g data-handle="${name}" transform="translate(${f(x)} ${f(y)})"><circle class="hd-hit" r="${f(0.6 * s)}"/><circle class="hd" r="${f(0.22 * s)}"/></g>`;
 
 export function renderSelection(el, page, b) {
-  const s = FIELDS[b.fieldType].s;
+  const s = FIELDS[b.fieldType].s * (isNet(page) ? 0.55 : 1); // Netzansicht: kleinerer Maßstab-Ausschnitt
   const pad = 0.12 * s;
   switch (el.type) {
     case 'player':
       return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.45 * s * (el.size || 1) + pad)}"/>`;
     case 'marker':
       return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.4 * s * (el.size || 1))}"/>` + (el.from ? handle('from', el.from.x, el.from.y, s) : '');
+    case 'link': {
+      const a = page?.elements.find((e) => e.id === el.a), z = page?.elements.find((e) => e.id === el.b);
+      return a && z ? `<line class="sel" x1="${f(a.x)}" y1="${f(a.y)}" x2="${f(z.x)}" y2="${f(z.y)}"/>` : '';
+    }
     case 'arrow':
       return handle('a1', el.x1, el.y1, s) + handle('a2', el.x2, el.y2, s);
     case 'zone':
@@ -201,5 +220,5 @@ export function renderSelection(el, page, b) {
 }
 
 export function thumbSVG(page, b) {
-  return `<svg viewBox="${viewBox(b.fieldType, page.half)}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${renderField(b, page.half)}${renderElements(page, b)}</svg>`;
+  return `<svg viewBox="${viewBox(b.fieldType, page.half, 0, page)}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${renderField(b, page.half, page)}${renderElements(page, b)}</svg>`;
 }

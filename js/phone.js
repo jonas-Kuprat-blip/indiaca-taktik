@@ -119,6 +119,7 @@ function enter() {
   move(groups[2], panels.stift); // Strichstärke / gestrichelt
   const sec = (n) => document.querySelector(`#palette > .pal-sec[data-sec="${n}"]`);
   move(sec('ziel'), panels.formen); // Ziel / Position (Punkt, Kreuz, Indiaca)
+  move(sec('netz'), panels.formen); // Netzansicht: Höhen-Marker
   move(sec('zonen'), panels.formen); // Zonen
   move(sec('spieler'), panels.spieler); // Standardfiguren
   move(sec('kader'), panels.spieler); // Kader + Aufstellung einsetzen

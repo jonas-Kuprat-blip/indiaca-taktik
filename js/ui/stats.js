@@ -1,10 +1,10 @@
 import { h } from '../util.js';
 import { I } from '../icons.js';
 import { board, touch, emit, on } from '../store.js';
-import { ACTION_CATS, activeActions, POS_NUMS, roleName, squadById } from '../library.js';
+import { ACTION_CATS, activeActions, POS_NUMS, roleName } from '../library.js';
 import {
   game, gs, candidates, countsOf, gradeOf, addEvent, deleteEvent, setCount, setPart, nextSet, gotoSet, undo, canUndo,
-  resetStats, result, actionInfo, COMPS, TEAM_ACTIONS,
+  resetStats, countsAllTime, result, actionInfo, COMPS, TEAM_ACTIONS, autoOpponent, squadOfTeam, teamCounts,
 } from '../gamestats.js';
 import { modal, confirmDlg, toast } from './dialogs.js';
 
@@ -86,7 +86,7 @@ export function openStats(tab) {
       },
       h('span', { class: 'lv-kz' }, c.short || '?'),
       h('span', { class: 'lv-nm' }, c.name),
-      h('span', { class: 'lv-meta' }, [c.nummer !== '' && c.nummer != null ? '#' + c.nummer : null, c.pos ? 'Pos ' + c.pos : null].filter(Boolean).join(' · ') || ' '),
+      h('span', { class: 'lv-meta' }, [c.nummer !== '' && c.nummer != null ? '#' + c.nummer : null, c.pos ? 'R' + c.pos : null].filter(Boolean).join(' · ') || ' '),
       c.n ? h('span', { class: 'lv-n' }, String(c.n)) : null);
     const acts = activeActions();
     const groups = ACTION_CATS.map(([cat, label]) => [label, acts.filter((a) => a.cat === cat)]).filter(([, l]) => l.length);
@@ -108,7 +108,7 @@ export function openStats(tab) {
       h('div', { class: 'lv-left' },
         h('div', { class: 'lv-hint' + (sel || armed ? ' on' : '') }, hint),
         own.length || opp.length
-          ? h('div', { class: 'lv-grid' }, own.map(tile), opp.length ? h('div', { class: 'lv-sep muted small' }, 'Gegner') : null, opp.map(tile))
+          ? h('div', { class: 'lv-grid' }, own.length && opp.length ? h('div', { class: 'lv-sep muted small' }, squadOfTeam(b, 'own')?.name || 'Eigenes Team') : null, own.map(tile), opp.length ? h('div', { class: 'lv-sep muted small' }, squadOfTeam(b, 'opp')?.name || 'Gegner') : null, opp.map(tile))
           : h('p', { class: 'muted' }, NO_PLAYERS),
         h('div', { class: 'lv-hist' },
           h('div', { class: 'muted small' }, 'Letzte Eingaben'),
@@ -139,7 +139,7 @@ export function openStats(tab) {
       [['alle', 'Alle'], ...usedCats].map(([c, l]) => h('button', { class: 'chip' + (ndCat === c ? ' active' : ''), onclick: () => { ndCat = c; render(); } }, l)));
     const cols = `minmax(150px, 1.4fr) 64px 76px repeat(${acts.length}, 124px) 64px`;
     const head = h('div', { class: 'nd-row nd-head', style: { gridTemplateColumns: cols } },
-      h('div', { class: 'nd-name' }, 'Spieler'), h('div', {}, 'Einsatz'), h('div', {}, 'Pos.'),
+      h('div', { class: 'nd-name' }, 'Spieler'), h('div', {}, 'Einsatz'), h('div', {}, 'Rolle'),
       acts.map((a) => h('div', { class: 'nd-ah ' + signClass(a.sign), title: catLabel(a.cat) }, a.label)), h('div', {}, 'Note'));
     const totals = {};
     const grades = [];
@@ -150,9 +150,9 @@ export function openStats(tab) {
       const opts = { team: c.team, name: c.name };
       const roleBtn = h('button', { class: 'role-chip ' + c.role, title: 'Rolle umschalten (für die Note)', onclick: () => setPart(b, c.pid, { role: c.role === 'zuspiel' ? 'angriff' : 'zuspiel' }, opts) }, c.role === 'zuspiel' ? 'Z' : 'A');
       const sw = h('button', { class: 'switch' + (c.played ? ' on' : ''), role: 'switch', 'aria-checked': String(c.played), 'aria-label': `${c.name} hat gespielt`, onclick: () => setPart(b, c.pid, { played: !c.played }, opts) }, h('span'));
-      const pos = h('select', { class: 'input select nd-pos', 'aria-label': `${c.name} Position` },
-        h('option', { value: '' }, '–'), POS_NUMS.map((n) => h('option', { value: n, selected: c.pos === n, title: roleName(n) }, String(n))));
-      pos.onchange = () => setPart(b, c.pid, { pos: pos.value ? +pos.value : null }, opts);
+      const pos = h('select', { class: 'input select nd-pos', 'aria-label': `${c.name} Rolle`, title: c.pos ? roleName(c.pos) : 'Rolle' },
+        h('option', { value: '' }, '–'), POS_NUMS.map((n) => h('option', { value: n, selected: c.pos === n }, `R${n} ${roleName(n)}`)));
+      pos.onchange = () => setPart(b, c.pid, { rolle: pos.value ? +pos.value : null, pos: null }, opts);
       return h('div', { class: 'nd-row' + (c.played ? '' : ' off'), style: { gridTemplateColumns: cols } },
         h('div', { class: 'nd-name' }, roleBtn, h('span', { class: 'nm' }, c.name), c.archived ? h('span', { class: 'muted small' }, ' (archiviert)') : null),
         h('div', {}, sw), h('div', {}, pos),
@@ -178,7 +178,8 @@ export function openStats(tab) {
       h('div', { class: 'nd-name' }, 'Gesamt'), h('div', {}), h('div', {}),
       acts.map((a) => h('div', {}, String(totals[a.id] || 0))),
       h('div', {}, h('span', { class: 'grade ' + gradeClass(tg) }, gradeText(tg))));
-    const oppRows = opp.length ? [h('div', { class: 'nd-sub muted small' }, 'Gegner'), ...opp.map(row)] : [];
+    const oppSq = squadOfTeam(b, 'opp');
+    const oppRows = opp.length ? [h('div', { class: 'nd-sub muted small' }, (oppSq?.name || 'Gegner') + (teamCounts(b, 'opp') ? '' : ' · zählt nicht in Hall of Fame/Profile')), ...opp.map(row)] : [];
     const info = h('details', { class: 'st-info' },
       h('summary', {}, 'Wie wird die Note berechnet?'),
       h('p', { class: 'small' }, 'Positive Aktionen +1, negative −1, neutrale 0. Gute Annahme +0,5 · Gute Abwehr +0,5 (Zuspieler +0,75) · Perfektes Zuspiel +0,5 (Zuspieler +1).'),
@@ -198,8 +199,9 @@ export function openStats(tab) {
     const sw = h('button', { class: 'switch' + (g.isGame ? ' on' : ''), role: 'switch', 'aria-checked': String(g.isGame), 'aria-label': 'Dieses Board ist ein Spiel', onclick: () => { g.isGame = !g.isGame; save(); } }, h('span'));
     const date = h('input', { class: 'input', type: 'date', value: g.date });
     date.onchange = () => { g.date = date.value || g.date; save(); };
-    const opp = h('input', { class: 'input', value: g.opponent, placeholder: squadById(b.oppSquadId)?.name || 'z. B. TV Musterstadt' });
-    opp.onchange = () => { g.opponent = opp.value.trim(); save(); };
+    const auto = autoOpponent(b);
+    const opp = h('input', { class: 'input', value: g.opponent || auto, placeholder: 'z. B. TV Musterstadt' });
+    opp.onchange = () => { const v = opp.value.trim(); g.opponent = v === auto ? '' : v; save(); };
     const comp = h('div', { class: 'seg' }, COMPS.map(([k, l]) => h('button', { class: 'seg-btn' + (g.comp === k ? ' active' : ''), onclick: () => { g.comp = k; save(); } }, l)));
     const num = (v, set, label) => {
       const i = h('input', { class: 'input set-in', type: 'text', inputmode: 'numeric', value: String(v), 'aria-label': label });
@@ -218,15 +220,15 @@ export function openStats(tab) {
     const res = h('div', { class: 'seg' },
       [[null, `Automatisch (${autoTxt})`], ['win', 'Sieg'], ['loss', 'Niederlage']].map(([k, l]) =>
         h('button', { class: 'seg-btn' + (g.result === k ? ' active' : ''), onclick: () => { g.result = k; save(); } }, l)));
-    const warn = g.isGame && !b.squadId
-      ? h('p', { class: 'warn small' }, 'Dieses Board hat keine Board-Mannschaft und zählt deshalb nicht in die All-Time-Statistik. Mannschaft in den Board-Einstellungen wählen.')
+    const warn = g.isGame && !countsAllTime(b)
+      ? h('p', { class: 'warn small' }, 'Im Spiel-Setup ist keine eigene Mannschaft gewählt – das Board zählt deshalb nicht in die All-Time-Statistik. Mannschaft in den Board-Einstellungen wählen.')
       : !g.isGame ? h('p', { class: 'muted small' }, 'Nicht als Spiel markiert: Die Statistik dieses Boards zählt nicht in Spielerprofile und Hall of Fame (z. B. Training ohne Wertung).') : null;
     return h('div', { class: 'form st-game' },
       h('div', { class: 'set-row' }, h('div', {}, h('b', {}, 'Dieses Board ist ein Spiel'), h('div', { class: 'muted small' }, 'Zählt in All-Time-Stats und Hall of Fame')), sw),
       warn,
       h('div', { class: 'form-2' },
         h('label', { class: 'form-row' }, h('span', {}, 'Datum'), date),
-        h('label', { class: 'form-row' }, h('span', {}, 'Gegner'), opp)),
+        h('label', { class: 'form-row' }, h('span', {}, auto && !g.opponent ? 'Gegner (aus Spiel-Setup)' : 'Gegner'), opp)),
       h('div', { class: 'form-row' }, h('span', {}, 'Wettbewerb'), comp),
       h('div', { class: 'form-row' }, h('span', {}, 'Ergebnis (Punkte je Satz – Wir : Gegner)'), sets),
       h('div', { class: 'form-row' }, h('span', {}, `Sieg / Niederlage · Sätze ${r.won}:${r.lost}`), res),

@@ -1,6 +1,6 @@
 import { state } from './store.js';
-import { lib, actionById, squadById } from './library.js';
-import { game, gs, countsOf, participation, result, countsAllTime, opponentName, gradeOf } from './gamestats.js';
+import { lib, actionById, anyPlayer } from './library.js';
+import { game, gs, countsOf, participation, result, countsAllTime, opponentName, gradeOf, teamCounts, squadOfTeam } from './gamestats.js';
 
 /*
  * All-Time-Auswertung über alle Boards, die als „Spiel“ markiert sind und eine Board-Mannschaft haben.
@@ -44,7 +44,7 @@ export function playerGames(pid, f = DEFAULT_FILTER, boards = gameBoards(f)) {
   const out = [];
   for (const b of boards) {
     const c = participation(b).find((x) => x.pid === pid);
-    if (!c) continue;
+    if (!c || !teamCounts(b, c.team)) continue; // Gegner-/Liga-Mannschaften zählen nicht
     const r = result(b);
     let res = r.res, won = r.won, lost = r.lost;
     if (c.team === 'opp') { // Spieler stand beim Gegner (z. B. vereinsinternes Spiel)
@@ -54,7 +54,7 @@ export function playerGames(pid, f = DEFAULT_FILTER, boards = gameBoards(f)) {
     const counts = countsOf(b).get(pid) || {};
     const g = game(b);
     out.push({
-      b, date: g.date, opp: c.team === 'opp' ? squadById(b.squadId)?.name || '' : opponentName(b), comp: g.comp,
+      b, date: g.date, opp: c.team === 'opp' ? squadOfTeam(b, 'own')?.name || '' : opponentName(b), comp: g.comp,
       res, sets: r.sets, won, lost, pos: c.pos, team: c.team, counts, grade: gradeOf(counts, c.role),
     });
   }
@@ -102,7 +102,7 @@ export function playerSummary(pid, f = DEFAULT_FILTER) {
   let sets = 0;
   for (const g of sum.games) {
     sets += g.sets;
-    if (g.pos) posCount[g.pos] = (posCount[g.pos] || 0) + 1;
+    if (g.pos) posCount[g.pos] = (posCount[g.pos] || 0) + 1; // pos = Rolle R1–R5
   }
   return { ...sum, sets, posCount, quotes: quotes(sum.totals) };
 }
@@ -113,7 +113,8 @@ export function allPlayers(f = DEFAULT_FILTER) {
   const pids = new Set();
   for (const b of boards) for (const c of participation(b)) if (!c.pid.startsWith('n:')) pids.add(c.pid);
   for (const b of boards) for (const e of gs(b).ev) if (e.p && !e.p.startsWith('n:')) pids.add(e.p);
-  return [...pids].map((pid) => ({ pid, ...playerSummaryFrom(playerGames(pid, f, boards)) })).filter((p) => p.n > 0);
+  // externe Gegner-Spieler nicht in die Hall of Fame
+  return [...pids].filter((pid) => !anyPlayer(pid)?.extern).map((pid) => ({ pid, ...playerSummaryFrom(playerGames(pid, f, boards)) })).filter((p) => p.n > 0);
 }
 function playerSummaryFrom(games) {
   const totals = {}, records = {};

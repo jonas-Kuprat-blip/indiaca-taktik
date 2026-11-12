@@ -73,23 +73,23 @@ export function openProfile(pid, { onEdit } = {}) {
     const noPos = s.n - POS_NUMS.reduce((a, n) => a + (s.posCount[n] || 0), 0);
     const posBars = h('div', { class: 'pos-bars' },
       POS_NUMS.map((n) => h('div', { class: 'pb' },
-        h('span', { class: 'pb-l' }, `${n} · ${roleName(n)}`),
+        h('span', { class: 'pb-l' }, roleName(n)),
         h('span', { class: 'pb-t' }, h('span', { class: 'pb-f', style: { width: `${((s.posCount[n] || 0) / maxPos) * 100}%` } })),
         h('span', { class: 'pb-n' }, String(s.posCount[n] || 0)))),
-      noPos > 0 ? h('div', { class: 'muted small' }, `${noPos} Spiel(e) ohne Position`) : null);
+      noPos > 0 ? h('div', { class: 'muted small' }, `${noPos} Spiel(e) ohne Rolle`) : null);
 
     // Spielliste (neueste zuerst)
     const list = h('div', { class: 'prof-games' },
       [...s.games].reverse().map((g) =>
         h('button', { class: 'pg-row', onclick: () => go(g.b.id) },
           h('span', { class: 'pg-res ' + (g.res || '') }, resText(g)),
-          h('span', { class: 'pg-main' }, h('b', {}, g.opp ? 'vs ' + g.opp : g.b.name), h('span', { class: 'muted small' }, `${fmtDate(g.date)} · ${compLabel(g.comp)} · Sätze ${g.won}:${g.lost}${g.pos ? ' · Pos. ' + g.pos : ''}`)),
+          h('span', { class: 'pg-main' }, h('b', {}, g.opp ? 'vs ' + g.opp : g.b.name), h('span', { class: 'muted small' }, `${fmtDate(g.date)} · ${compLabel(g.comp)} · Sätze ${g.won}:${g.lost}${g.pos ? ' · ' + roleName(g.pos) : ''}`)),
           h('span', { class: 'grade ' + gradeClass(g.grade) }, gradeText(g.grade)))));
 
     body.replaceChildren(...[head, filterBar(f, render), kpis, qs,
       h('h3', {}, 'Verlauf'), chart(s.games),
       h('h3', {}, 'Aktionen'), h('div', { class: 'tbl-wrap' }, table),
-      h('h3', {}, 'Einsätze pro Position'), posBars,
+      h('h3', {}, 'Einsätze pro Rolle'), posBars,
       h('h3', {}, `Spiele (${s.n})`), list].filter(Boolean));
   };
   const go = (boardId) => {

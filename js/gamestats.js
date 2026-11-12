@@ -59,10 +59,20 @@ export function gs(b = board()) {
   return s;
 }
 
-/** Gegnername: eingetragen, sonst Name der Gegner-Mannschaft */
-export const opponentName = (b) => game(b).opponent.trim() || squadById(b.oppSquadId)?.name || '';
-/** Zählt dieses Board in die All-Time-Statistik? */
-export const countsAllTime = (b) => !!(b.game?.isGame && b.squadId);
+/** Gegner automatisch aus dem Spiel-Setup: die Gegner-/Liga-Mannschaft, sonst die andere Seite */
+export function autoOpponent(b) {
+  const own = squadById(b.squadId), opp = squadById(b.oppSquadId);
+  if (own?.typ === 'gegner' && opp?.typ !== 'gegner') return own.name;
+  return opp?.name || '';
+}
+/** Gegnername: eingetragen, sonst aus dem Spiel-Setup */
+export const opponentName = (b) => game(b).opponent.trim() || autoOpponent(b);
+/** Mannschaft eines Teams auf dem Board */
+export const squadOfTeam = (b, team) => squadById(team === 'opp' ? b.oppSquadId : b.squadId);
+/** Zählt dieses Board in die All-Time-Statistik? (Spiel + mindestens eine eigene Mannschaft) */
+export const countsAllTime = (b) => !!(b.game?.isGame && [b.squadId, b.oppSquadId].some((id) => { const s = squadById(id); return s && s.typ !== 'gegner'; }));
+/** Zählen Einträge dieses Teams für Hall of Fame / Profile? (nicht für Gegner-/Liga-Mannschaften) */
+export const teamCounts = (b, team) => squadOfTeam(b, team)?.typ !== 'gegner';
 
 /** Sätze und Ergebnis aus Sicht der Board-Mannschaft */
 export function result(b) {
@@ -98,11 +108,12 @@ export function candidates(b = board()) {
   };
   for (const p of b.pages) for (const e of p.elements) {
     if (e.type !== 'player') continue;
-    if (e.rosterId) add(e.rosterId, e.team, { pos: e.pos ?? null, role: e.role, onField: true });
-    else if (e.label?.trim()) add(nameKey(e.team, e.label), e.team, { name: e.label.trim(), pos: e.pos ?? null, role: e.role, onField: true });
+    if (e.rosterId) add(e.rosterId, e.team, { pos: e.rolle || e.pos || null, role: e.role, onField: true });
+    else if (e.label?.trim()) add(nameKey(e.team, e.label), e.team, { name: e.label.trim(), pos: e.rolle || e.pos || null, role: e.role, onField: true });
   }
-  const own = squadById(b.squadId);
-  for (const id of own?.spielerIds || []) add(id, 'own');
+  // Kader beider Mannschaften (z. B. Herren 1 gegen Herren 2)
+  for (const id of squadById(b.squadId)?.spielerIds || []) add(id, 'own');
+  for (const id of squadById(b.oppSquadId)?.spielerIds || []) add(id, 'opp');
   for (const [pid, v] of Object.entries(s.part)) add(pid, v.team || 'own', { name: v.name });
   for (const e of s.ev) if (e.p && !map.has(e.p)) add(e.p, s.part[e.p]?.team || 'own', { name: s.part[e.p]?.name });
   const cnt = countsOf(b);
@@ -111,12 +122,13 @@ export function candidates(b = board()) {
     if (isRosterPid(c.pid) && !pl) return null; // Spieler gelöscht (ohne Archiv)
     const part = s.part[c.pid] || {};
     const n = Object.values(cnt.get(c.pid) || {}).reduce((a, x) => a + x, 0);
-    const pos = part.pos ?? c.pos ?? pl?.stdPos ?? null;
+    // „pos“ ist hier die Rolle R1–R5 (früher als Position gespeichert; in Läufer 2 identisch)
+    const pos = part.rolle ?? part.pos ?? c.pos ?? pl?.stdPos ?? null;
     return {
       pid: c.pid, team: part.team || c.team || 'own',
       name: pl?.name || c.name || part.name || '?', short: pl?.kuerzel || (c.name || part.name || '?').slice(0, 2).toUpperCase(),
       nummer: pl?.nummer ?? '', roster: !!pl, archived: !!pl && !playerById(c.pid),
-      pos, role: part.role || c.role || (pos ? roleOfPos(pos) : 'angriff'),
+      pos, rolle: pos, extern: !!pl?.extern, role: part.role || c.role || (pos ? roleOfPos(pos) : 'angriff'),
       played: part.played ?? (n > 0 || !!c.onField), n,
     };
   }).filter(Boolean);

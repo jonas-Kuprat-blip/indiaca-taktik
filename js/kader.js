@@ -255,7 +255,7 @@ export function fillPageWithLineups(p, b = board()) {
 /** Seite aus Vorlage: auf die Feldseite des Boards spiegeln und mit Aufstellung füllen */
 export function pageFromTpl(t, b = board()) {
   const p = pageFromTemplate(t);
-  if ((t.ownSide || 'left') !== (b.ownSide || 'left')) mirrorPage(p);
+  if (!isNet(p) && (t.ownSide || 'left') !== (b.ownSide || 'left')) mirrorPage(p); // Netzansicht ist immer Spielersicht
   return fillPageWithLineups(p, b);
 }
 

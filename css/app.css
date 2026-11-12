@@ -625,6 +625,7 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 #stage-wrap.net3d:not(.anim) #net3d-hint { display: block; }
 #stage-wrap.net3d #hint, #stage-wrap.net3d #selbar, #stage-wrap.net3d #net-readout { display: none !important; }
 .nv3-mesh { fill: rgba(15, 23, 42, .22); }
+.nv3-side { opacity: .75; }
 .nv3-ml { stroke: rgba(15, 23, 42, .35); stroke-width: 0.0015; }
 .nv3-band { stroke: #fff; stroke-width: 0.008; }
 .nv3-post { stroke: #475569; stroke-width: 0.012; stroke-linecap: round; }

@@ -403,6 +403,47 @@ const OWN = Object.fromEntries([1, 2, 3, 4, 5].map((n) => ['p' + n, xy(n, 'left'
 const OPP = Object.fromEntries([1, 2, 3, 4, 5].map((n) => ['o' + n, xy(n, 'right')]));
 const withOpp = (own, opp = {}) => ({ ...OPP, ...opp, ...own });
 
+// ---------- Beispiele in der Netzansicht (3D) ----------
+/*
+ * Sicht eines eigenen Spielers an der 3-m-Linie aufs Netz: x = Meter ab linker Seitenlinie, y = −Höhe.
+ * Silhouetten: eigene vor dem Netz, Gegner (Block) dahinter. Ball = Indiaca-Marker.
+ */
+function netExample(name, steps) {
+  const pg = {
+    id: uid(), kind: 'anim', name, notes: '', elements: [], net: { preset: 'herren', view: '3d' },
+    anim: { cur: 0, steps: steps.map((st) => ({ id: uid(), dur: st.dur || 1, note: st.note, els: Object.fromEntries(st.els.map((e) => [e.id, clone(e)])) })) },
+  };
+  netCfg(pg);
+  load(pg, 0);
+  return { id: 'ex-' + name, name, builtin: true, fieldType: 'indiaca', ownSide: 'left', page: pg };
+}
+const SIL = (id, x, sprung, extra) => ({ id, type: 'sil', y: 0, x, sprung, groesse: 1.85, team: 'own', color: '#2563eb', label: '', ...extra });
+const ZU = (x, sprung = 0) => SIL('n_zu', x, sprung, { label: '1. Zuspieler', short: 'Z', groesse: 1.8 });
+const BL = (id, x, sprung = 0) => SIL(id, x, sprung, { team: 'opp', color: '#dc2626', label: 'Block', short: 'B' });
+const BALL = (x, h) => ({ id: 'n_ball', type: 'marker', symbol: 'indiaca', color: '#dc2626', label: '', size: 1, x, y: -h });
+const TP = (x, h) => ({ id: 'n_tp', type: 'marker', symbol: 'x', color: '#ef4444', label: 'Treffpunkt', size: 1, x, y: -h });
+const UEB = (x, h) => ({ id: 'n_ueb', type: 'marker', symbol: 'ring', color: '#3b82f6', label: 'über die Netzkante', size: 1, x, y: -h });
+const FLUG = { id: 'n_flug', type: 'link', a: 'n_tp', b: 'n_ueb', color: '#ef4444', dashed: true };
+
+function netExamples() {
+  const AA = (x, sprung = 0) => SIL('n_aa', x, sprung, { label: 'Außenangreifer', short: 'AA' });
+  const HA = (x, sprung = 0) => SIL('n_ha', x, sprung, { label: 'Hauptangreifer', short: 'HA', groesse: 1.9 });
+  return [
+    netExample('3D: Außenangriff', [
+      { note: '1. Zuspieler nimmt die Indiaca – Außenangreifer startet links', els: [ZU(4.7), AA(1.5), BL('n_b1', 3.8), BL('n_b2', 2.7), BALL(4.6, 2.3)] },
+      { note: 'Hohes Zuspiel nach außen – der Block verschiebt mit', dur: 1.2, els: [ZU(4.7, 0.15), AA(1.15), BL('n_b1', 2.5), BL('n_b2', 1.7), BALL(2.8, 3.6)] },
+      { note: 'Absprung – Treffpunkt hoch über der Netzkante', els: [ZU(4.6), AA(1.0, 0.6), BL('n_b1', 2.3, 0.45), BL('n_b2', 1.55, 0.5), BALL(1.19, 3.06), TP(1.19, 3.06)] },
+      { note: 'Schlag an der Linie entlang – am Block vorbei über die Netzkante', dur: 0.7, els: [ZU(4.6), AA(1.0, 0.1), BL('n_b1', 2.3, 0.2), BL('n_b2', 1.55, 0.25), BALL(0.5, 2.5), TP(1.19, 3.06), UEB(0.5, 2.5), FLUG] },
+    ]),
+    netExample('3D: Mittelangriff', [
+      { note: '1. Zuspieler mit der Indiaca – Hauptangreifer läuft in der Mitte an', els: [ZU(4.7), HA(3.1), BL('n_b1', 3.2), BL('n_b2', 4.2), BALL(4.6, 2.3)] },
+      { note: 'Schnelles, kurzes Zuspiel in die Mitte', dur: 0.8, els: [ZU(4.7, 0.1), HA(3.0, 0.35), BL('n_b1', 3.1, 0.1), BL('n_b2', 3.9), BALL(3.6, 2.95)] },
+      { note: 'Absprung – Schlag, bevor der Block steht', dur: 0.7, els: [ZU(4.7), HA(3.0, 0.7), BL('n_b1', 3.0, 0.35), BL('n_b2', 3.7, 0.2), BALL(3.19, 3.23), TP(3.19, 3.23)] },
+      { note: 'Steil über die Netzkante zwischen die Blockhände', dur: 0.6, els: [ZU(4.7), HA(3.0, 0.1), BL('n_b1', 3.0, 0.45), BL('n_b2', 3.7, 0.4), BALL(2.55, 2.48), TP(3.19, 3.23), UEB(2.55, 2.48), FLUG] },
+    ]),
+  ];
+}
+
 export function exampleTemplates() {
   const srv = [8.4, OPP.o1[1]]; // Aufschläger des Gegners hinter seiner Grundlinie (Pos. 1)
   return [
@@ -430,5 +471,6 @@ export function exampleTemplates() {
       { note: 'Annahme durch den Außenangreifer (hinten rechts)', dur: 1.4, pos: withOpp({ ...OWN, p1: [-6.2, 1.8], ball: [-6, 1.8] }) },
       { note: 'Pass zum 1. Zuspieler', pos: withOpp({ ...OWN, p1: [-5.8, 1.6], p3: [-3.4, 0.2], p2: [-1, 1.9], ball: [-0.7, 1.8] }) },
     ]),
+    ...netExamples(),
   ];
 }

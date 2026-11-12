@@ -28,19 +28,24 @@ let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar, rotpanel, rotI
 let yaw3 = 0;
 // 3D-Ansicht: Zoom/Verschieben über die viewBox (Basis = VIEWBOX_3D)
 const VB3 = VIEWBOX_3D.split(' ').map(Number);
+const Z3_MIN = 0.2, Z3_MAX = 5; // weit heraus (ganze Halle) bis nah heran
 const view3 = { z: 1, cx: VB3[0] + VB3[2] / 2, cy: VB3[1] + VB3[3] / 2 };
+// z < 1: Kamera fährt zurück (Dolly), statt das Bild zu verzerren; z > 1: Bildausschnitt vergrößern
+const dolly3 = () => (view3.z < 1 ? (1 / view3.z - 1) * 4 : 0);
 function applyView3() {
-  const w = VB3[2] / view3.z, h = VB3[3] / view3.z;
+  if (view3.z <= 1) Object.assign(view3, { cx: VB3[0] + VB3[2] / 2, cy: VB3[1] + VB3[3] / 2 });
+  const zz = Math.max(1, view3.z);
+  const w = VB3[2] / zz, h = VB3[3] / zz;
   v3?.setAttribute('viewBox', `${view3.cx - w / 2} ${view3.cy - h / 2} ${w} ${h}`);
 }
 function zoom3(factor, at = { x: view3.cx, y: view3.cy }) {
-  const z = Math.max(1, Math.min(5, view3.z * factor));
+  const z = Math.max(Z3_MIN, Math.min(Z3_MAX, view3.z * factor));
   const k = view3.z / z;
   view3.cx = at.x - (at.x - view3.cx) * k;
   view3.cy = at.y - (at.y - view3.cy) * k;
   view3.z = z;
-  if (z === 1) Object.assign(view3, { cx: VB3[0] + VB3[2] / 2, cy: VB3[1] + VB3[3] / 2 });
   applyView3();
+  draw3d();
 }
 function reset3() {
   yaw3 = 0;
@@ -166,10 +171,11 @@ export function initStage(wrap) {
     } else if (g3.kind === 'pinch' && ptrs3.size >= 2) {
       if (state.viewLocked) return;
       const [a, b] = [...ptrs3.values()];
-      const z = Math.max(1, Math.min(5, (g3.z * Math.hypot(a.x - b.x, a.y - b.y)) / (g3.d || 1)));
+      const z = Math.max(Z3_MIN, Math.min(Z3_MAX, (g3.z * Math.hypot(a.x - b.x, a.y - b.y)) / (g3.d || 1)));
       // Punkt unter der Fingermitte bleibt fest; Verschieben folgt der Fingermitte
       Object.assign(view3, { z, cx: g3.cx, cy: g3.cy });
       applyView3();
+      draw3d();
       const m = vb3((a.x + b.x) / 2, (a.y + b.y) / 2);
       const k = g3.z / z;
       view3.cx = g3.m.x - (g3.m.x - g3.cx) * k - (m.x - g3.m.x);
@@ -342,7 +348,7 @@ function draw3d(pg) {
   if (!on3) return;
   const src = pg || (frameOverride ? frameOverride() : p);
   cancelAnimationFrame(raf3);
-  raf3 = requestAnimationFrame(() => (v3.innerHTML = render3d(src, board(), yaw3)));
+  raf3 = requestAnimationFrame(() => (v3.innerHTML = render3d(src, board(), yaw3, dolly3())));
 }
 
 function drawEls() {

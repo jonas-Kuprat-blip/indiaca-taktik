@@ -13,14 +13,18 @@ const EYE = 1.7, NEAR = 0.25, FOCAL = 1;
 export const VIEWBOX_3D = '-1.25 -0.82 2.5 1.6';
 const f = (n) => Math.round(n * 10000) / 10000;
 
-export function render3d(pg, b, yaw = 0) {
+/** dolly ≥ 0: Kamera fährt so viele Meter zurück (und etwas nach oben) – zum Herauszoomen */
+export function render3d(pg, b, yaw = 0, dolly = 0) {
   const F = FIELDS[b.fieldType] || FIELDS.indiaca;
   const W = F.width, L2 = F.length / 2, A = F.attack, H = netCfg(pg).hoehe;
-  const cam = { x: W / 2, y: EYE, z: -A };
+  const cam = { x: W / 2, y: EYE + dolly * 0.45, z: -A - dolly };
+  const pitch = Math.atan2(dolly * 0.45, A + dolly) * 0.9; // beim Zurückfahren leicht nach unten schauen
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
   const c = Math.cos(yaw), s = Math.sin(yaw);
   const view = ([X, Y, Z]) => {
-    const dx = X - cam.x, dz = Z - cam.z;
-    return [dx * c - dz * s, Y - cam.y, dx * s + dz * c];
+    const dx = X - cam.x, dz = Z - cam.z, dy = Y - cam.y;
+    const x1 = dx * c - dz * s, z1 = dx * s + dz * c;
+    return [x1, dy * cp + z1 * sp, -dy * sp + z1 * cp];
   };
   const proj = ([x, y, z]) => [FOCAL * x / z, -FOCAL * y / z];
   // Polygon an der Nahebene abschneiden (Sutherland-Hodgman, eine Ebene)
@@ -51,8 +55,11 @@ export function render3d(pg, b, yaw = 0) {
 
   let s3 = '';
   // Halle: Boden, Rückwand
-  s3 += poly([[-4, 0, -L2 - 3], [W + 4, 0, -L2 - 3], [W + 4, 0, L2 + 3], [-4, 0, L2 + 3]], 'class="f-out"');
-  s3 += poly([[-4, 0, L2 + 3], [W + 4, 0, L2 + 3], [W + 4, 7, L2 + 3], [-4, 7, L2 + 3]], 'class="nv-wall"');
+  s3 += poly([[-6, 0, -L2 - 30], [W + 6, 0, -L2 - 30], [W + 6, 0, L2 + 3], [-6, 0, L2 + 3]], 'class="f-out"');
+  s3 += poly([[-6, 0, L2 + 3], [W + 6, 0, L2 + 3], [W + 6, 8, L2 + 3], [-6, 8, L2 + 3]], 'class="nv-wall"');
+  // Seitenwände angedeutet
+  s3 += poly([[-6, 0, -L2 - 30], [-6, 0, L2 + 3], [-6, 8, L2 + 3], [-6, 8, -L2 - 30]], 'class="nv-wall nv3-side"');
+  s3 += poly([[W + 6, 0, -L2 - 30], [W + 6, 0, L2 + 3], [W + 6, 8, L2 + 3], [W + 6, 8, -L2 - 30]], 'class="nv-wall nv3-side"');
   s3 += poly([[-4, 2.2, L2 + 2.99], [W + 4, 2.2, L2 + 2.99]], 'class="nv-wall-band" style="stroke-width:0.004"');
   // Spielfeld beide Hälften
   s3 += poly([[0, 0, -L2], [W, 0, -L2], [W, 0, 0], [0, 0, 0]], 'class="f-court"');

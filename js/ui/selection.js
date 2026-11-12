@@ -4,6 +4,7 @@ import { COLORS, clampPlayer } from '../model.js';
 import { state, on, findEl, page, board, commit, snapshot, changed, select, scale } from '../store.js';
 import { colorPicker } from './dialogs.js';
 import { isNet, readoutText, fmtM, reachOf } from '../net.js';
+import { POSE_LABELS } from '../figure3d.js';
 import { startLink, linkPending } from '../stage.js';
 
 /** Schwebende Leiste über dem Feld für das ausgewählte Element */
@@ -141,10 +142,16 @@ export function initSelectionBar(wrap) {
         h('button', { class: 'btn', html: I.turnR, 'aria-label': 'Rechts drehen', title: 'Rechts drehen', onclick: () => turn(15) })] : [];
       parts.push(...sizeBtns(el), ...rotBtns, swatches(el), lbl('Deckkraft'), r, dup(el));
     } else if (el.type === 'sil') {
+      const ps = h('select', { class: 'input sm select', 'aria-label': 'Haltung' }, POSE_LABELS.map(([k, l]) => h('option', { value: k, selected: (el.pose || 'reach') === k }, l)));
+      ps.onchange = () => commit(() => (findEl(el.id).pose = ps.value));
+      const turnF = (d) => commit(() => { const z = findEl(el.id); const f0 = z.face ?? (z.team === 'opp' ? 180 : 0); z.face = ((((f0 + d + 180) % 360) + 360) % 360) - 180; });
+      parts.push(lbl('Haltung'), ps, lbl('Blick'),
+        h('button', { class: 'btn', html: I.turnL, 'aria-label': 'Nach links drehen', title: 'Blickrichtung nach links', onclick: () => turnF(30) }),
+        h('button', { class: 'btn', html: I.turnR, 'aria-label': 'Nach rechts drehen', title: 'Blickrichtung nach rechts', onclick: () => turnF(-30) }));
       parts.push(
         lbl('Größe ' + fmtM(el.groesse || 1.8)), slider(el, 'groesse', '1.3', '2.2', '0.01', 'Körpergröße', 1.8),
         lbl('Sprung ' + fmtM(el.sprung || 0)), slider(el, 'sprung', '0', '1.1', '0.01', 'Sprunghöhe', 0),
-        h('span', { class: 'sel-lbl net-h' }, 'Reichhöhe ' + fmtM(reachOf(el))),
+        h('span', { class: 'sel-lbl net-h' }, 'Reichhöhe gestreckt ' + fmtM(reachOf(el))),
         textInput(el, 'label', 'Name', 10), swatches(el));
     } else if (el.type === 'link') {
       parts.push(lbl('Linie'), swatches(el),

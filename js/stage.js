@@ -29,7 +29,12 @@ let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar, rotpanel, rotI
 let cam3 = null;
 const VB3 = VIEWBOX_3D.split(' ').map(Number);
 const DIST3 = [0.8, 45];
-const getCam3 = () => (cam3 ||= defaultCam3(board()));
+// Start-Blickwinkel: von der Seite gespeichert (z. B. Beispiel-Animationen), sonst Augenhöhe an der 3-m-Linie
+const startCam3 = () => {
+  const c = page()?.net?.cam;
+  return c && typeof c === 'object' ? { ...defaultCam3(board()), ...c } : defaultCam3(board());
+};
+const getCam3 = () => (cam3 ||= startCam3());
 function zoom3(factor) {
   const c = getCam3();
   c.dist = Math.max(DIST3[0], Math.min(DIST3[1], c.dist / factor));
@@ -60,7 +65,7 @@ function syncRot3() {
   rotLabel.textContent = deg + '°';
 }
 function reset3() {
-  cam3 = defaultCam3(board());
+  cam3 = startCam3();
   draw3d();
   syncRot3();
 }

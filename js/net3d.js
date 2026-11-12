@@ -1,7 +1,8 @@
 import { FIELDS } from './model.js';
 import { colorCss, esc } from './util.js';
 import { symbolMarkup } from './render.js';
-import { netCfg, NET_BAND, ANTENNA, silMarkup, fmtM } from './net.js';
+import { netCfg, NET_BAND, ANTENNA, fmtM } from './net.js';
+import { figureMarkup } from './figure3d.js';
 
 /*
  * 3D-Perspektive der Netzansicht – eigene, leichte Projektion in SVG (kein WebGL, keine Bibliothek).
@@ -122,18 +123,23 @@ export function render3d(pg, b, cam3 = defaultCam3(b)) {
   // sonst danach – jeweils von hinten nach vorn
   const camSide = camZ < 0 ? -1 : 1;
   const objs = [];
-  const silAt = (el) => {
-    const g = pt(el.x, 0, silZ(el));
-    if (!g) return '';
-    return `<g transform="translate(${f(g.p[0] - el.x * g.k)} ${f(g.p[1])}) scale(${f(g.k)})">${silMarkup(el)}</g>`;
+  // Figuren als echte 3D-Gliederpuppen (aus jedem Blickwinkel richtig)
+  const proj3 = (X, Y, Z) => {
+    const v = view([X, Y, Z]);
+    return v[2] < NEAR ? null : { p: proj(v), k: FOCAL / v[2], dz: v[2] };
   };
+  const silAt = (el) => `<g class="el sil" data-id="${esc(el.id)}">${figureMarkup(el, silZ(el), proj3)}</g>`;
   const markerAt = (e) => {
     const Z = depthOf(e);
     const m = pt(e.x, -e.y, Z);
     if (!m) return '';
     const r = Math.max(0.012, 0.14 * m.k * (e.size || 1)), col = colorCss(e.color);
     const [x, y] = m.p;
-    let o = `<g class="el mk3" data-id="${esc(e.id)}"><circle class="hit-a" cx="${f(x)}" cy="${f(y)}" r="${f(Math.max(0.035, r * 1.8))}"/>`;
+    let o = '';
+    // berechnete Flugkurve (Physik) gestrichelt
+    if (Array.isArray(e.trail) && e.trail.length > 1)
+      for (let i = 1; i < e.trail.length; i++) o += line(e.trail[i - 1], e.trail[i], `style="stroke:${col};stroke-width:0.005;stroke-dasharray:0.014 0.01;fill:none;opacity:.85"`);
+    o += `<g class="el mk3" data-id="${esc(e.id)}"><circle class="hit-a" cx="${f(x)}" cy="${f(y)}" r="${f(Math.max(0.035, r * 1.8))}"/>`;
     // Lot zum Boden + Bodenpunkt als Höhen-/Tiefenhilfe
     const g = pt(e.x, 0, Z);
     if (g) o += `<line x1="${f(x)}" y1="${f(y)}" x2="${f(g.p[0])}" y2="${f(g.p[1])}" style="stroke:${col};stroke-width:0.003;stroke-dasharray:0.01 0.01;opacity:.7"/><ellipse cx="${f(g.p[0])}" cy="${f(g.p[1])}" rx="${f(r * 0.9)}" ry="${f(r * 0.35)}" style="fill:rgba(0,0,0,.3)"/>`;

@@ -1,7 +1,7 @@
 import { FIELDS } from './model.js';
 import { strokePath } from './stroke.js';
 import { esc, colorCss } from './util.js';
-import { isNet, netBox, netViewBox, renderNetField, silMarkup, reachOf } from './net.js';
+import { isNet, netBox, netViewBox, renderNetField, silMarkup, silBox } from './net.js';
 
 const f = (n) => Math.round(n * 1000) / 1000;
 /** Zusätzlicher Größenfaktor für Spieler/Marker (Handy-Layout: etwas größer) */
@@ -163,6 +163,8 @@ export function renderOne(el, page, b, rot = 0) {
         from = `<circle cx="${f(el.from.x)}" cy="${f(el.from.y)}" r="${f(0.12 * s)}" style="fill:${colorCss(c)}"/>` +
           arrowMarkup(el.from.x, el.from.y, el.x - (dx / l) * gap, el.y - (dy / l) * gap, c, 0.06 * s, true);
       }
+      if (Array.isArray(el.trail) && el.trail.length > 1 && isNet(page))
+        from += `<path d="M${el.trail.map((q) => `${f(q[0])} ${f(-q[1])}`).join('L')}" style="fill:none;stroke:${colorCss(c)};stroke-width:${f(0.035 * s)};stroke-dasharray:${f(0.1 * s)} ${f(0.07 * s)};opacity:.85"/>`;
       const ms = s * (el.size || 1) * ui.tokenScale;
       return `<g class="el mk" data-id="${el.id}">${from}<g transform="translate(${f(el.x)} ${f(el.y)})${rot ? ` rotate(${rot})` : ''}"><circle class="hit-a" r="${f(0.45 * ms)}"/>${symbolMarkup(el.symbol, c, ms)}${
         el.label
@@ -177,7 +179,9 @@ export function renderOne(el, page, b, rot = 0) {
 const ORDER = { sil: -1, zone: 0, stroke: 1, arrow: 2, link: 2.5, marker: 3, player: 4 };
 export function renderElements(page, b, rot = 0) {
   if (!page) return '';
-  const els = [...page.elements].sort((a, c) => (ORDER[a.type] ?? 9) - (ORDER[c.type] ?? 9));
+  // Figuren der Netzansicht von hinten nach vorn (größere Tiefe = weiter hinten)
+  const dep = (e) => (typeof e.d === 'number' ? e.d : e.team === 'opp' ? 0.9 : -0.6);
+  const els = [...page.elements].sort((a, c) => (ORDER[a.type] ?? 9) - (ORDER[c.type] ?? 9) || (a.type === 'sil' && c.type === 'sil' ? dep(c) - dep(a) : 0));
   return els.map((e) => (e.fade != null ? `<g style="opacity:${f(e.fade)}">${renderOne(e, page, b, rot)}</g>` : renderOne(e, page, b, rot))).join('');
 }
 
@@ -194,8 +198,8 @@ export function renderSelection(el, page, b) {
     case 'marker':
       return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.4 * s * (el.size || 1))}"/>` + (el.from ? handle('from', el.from.x, el.from.y, s) : '');
     case 'sil': {
-      const H = el.groesse || 1.8, r = reachOf(el);
-      return `<rect class="sel" x="${f(el.x - 0.27 * H)}" y="${f(-r - 0.12)}" width="${f(0.54 * H)}" height="${f(r + 0.15)}"/>`;
+      const q = silBox(el);
+      return `<rect class="sel" x="${f(q.x0)}" y="${f(q.y0)}" width="${f(q.x1 - q.x0)}" height="${f(q.y1 - q.y0)}"/>`;
     }
     case 'link': {
       const a = page?.elements.find((e) => e.id === el.a), z = page?.elements.find((e) => e.id === el.b);

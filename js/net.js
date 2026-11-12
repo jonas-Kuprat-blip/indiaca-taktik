@@ -1,6 +1,7 @@
 import { FIELDS } from './model.js';
 import { lib, playerById, sideOf } from './library.js';
 import { esc, colorCss, uid } from './util.js';
+import { figureMarkup, figurePoints } from './figure3d.js';
 import { state } from './store.js';
 
 /*
@@ -158,30 +159,18 @@ export function silsFromField(src, b) {
   return out;
 }
 
-/** Silhouette zeichnen (Koordinaten in Metern, y nach oben negativ) */
-export function silMarkup(el, sel = false) {
-  const H = el.groesse || DEFAULT_SIZE, j = el.sprung || 0;
-  const k = (n) => f(n * H);
-  const fy = -j; // Füße
-  const Y = (t) => f(fy - t * H); // Höhe als Anteil der Körpergröße
-  const x = el.x, c = colorCss(el.color || '#2563eb');
+/** Figur in der 2D-Frontalansicht zeichnen (orthografisch: x seitlich, y = −Höhe; hinten zuerst) */
+export function silMarkup(el) {
+  const depth = typeof el.d === 'number' ? el.d : el.team === 'opp' ? 0.9 : -0.6;
+  const proj = (X, Y, Z) => ({ p: [X, -Y], k: 1, dz: Z });
   const opp = el.team === 'opp';
-  const lw = k(0.075), aw = k(0.06);
-  const reach = reachOf(el);
-  const body =
-    `<path d="M${f(x - 0.06 * H)} ${Y(0.82)}L${f(x + 0.06 * H)} ${Y(0.82)}L${f(x + 0.05 * H)} ${Y(0.5)}L${f(x - 0.05 * H)} ${Y(0.5)}Z" style="fill:${c};stroke:${c};stroke-width:${k(0.05)};stroke-linejoin:round"/>` +
-    `<circle cx="${f(x)}" cy="${Y(0.925)}" r="${k(0.062)}" style="fill:${c}"/>` +
-    // Beine
-    `<path d="M${f(x - 0.03 * H)} ${Y(0.5)}L${f(x - 0.06 * H)} ${Y(0)}M${f(x + 0.03 * H)} ${Y(0.5)}L${f(x + 0.06 * H)} ${Y(0)}" style="stroke:${c};stroke-width:${lw};stroke-linecap:round;fill:none"/>` +
-    // Schlagarm gestreckt nach oben (Reichhöhe), anderer Arm angewinkelt
-    `<path d="M${f(x + 0.07 * H)} ${Y(0.8)}L${f(x + 0.1 * H)} ${f(-reach + 0.035 * H)}" style="stroke:${c};stroke-width:${aw};stroke-linecap:round;fill:none"/>` +
-    `<path d="M${f(x - 0.07 * H)} ${Y(0.8)}L${f(x - 0.17 * H)} ${Y(0.66)}L${f(x - 0.12 * H)} ${Y(0.86)}" style="stroke:${c};stroke-width:${aw};stroke-linecap:round;stroke-linejoin:round;fill:none"/>`;
-  const handX = x + 0.1 * H;
-  const tick = `<line x1="${f(handX - 0.18)}" x2="${f(handX + 0.18)}" y1="${f(-reach)}" y2="${f(-reach)}" class="sil-reach"/>`;
-  const nm = el.short || (el.label || '').split(/\s+/)[0] || '';
-  const label = `<text class="sil-lbl" x="${f(handX)}" y="${f(-reach - 0.1)}" text-anchor="middle">${nm ? `<tspan class="sil-nm">${esc(nm)}</tspan> ` : ''}${fmtM(reach)}</text>`;
-  const shadow = j > 0.01 ? `<ellipse cx="${f(x)}" cy="0.02" rx="${k(0.12)}" ry="0.03" class="sil-shadow"/>` : '';
-  const hit = `<rect class="hit-a" x="${f(x - 0.25 * H)}" y="${f(-reach - 0.1)}" width="${k(0.5)}" height="${f(reach + 0.15)}"/>`;
-  return `<g class="el sil${opp ? ' opp' : ''}" data-id="${el.id}">${hit}${shadow}<g class="sil-b"${opp ? ' style="opacity:.5"' : ''}>${body}</g>${tick}${label}${
-    sel ? `<rect class="sel" x="${f(x - 0.27 * H)}" y="${f(-reach - 0.12)}" width="${k(0.54)}" height="${f(reach + 0.15)}"/>` : ''}</g>`;
+  return `<g class="el sil${opp ? ' opp' : ''}" data-id="${esc(el.id)}"${opp ? ' style="opacity:.75"' : ''}>${figureMarkup(el, depth, proj)}</g>`;
+}
+
+/** Umriss einer Figur (2D) für die Auswahl */
+export function silBox(el) {
+  const depth = typeof el.d === 'number' ? el.d : el.team === 'opp' ? 0.9 : -0.6;
+  const q = Object.values(figurePoints(el, depth));
+  const xs = q.map((v) => v[0]), ys = q.map((v) => -v[1]);
+  return { x0: Math.min(...xs) - 0.1, x1: Math.max(...xs) + 0.1, y0: Math.min(...ys) - 0.12, y1: Math.max(...ys) + 0.03 };
 }

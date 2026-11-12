@@ -2,6 +2,8 @@ import { h, uid, clone } from './util.js';
 import { I } from './icons.js';
 import { FIELDS, newPage, ensureAnim, ANIM_TYPES } from './model.js';
 import { isNet, netCfg } from './net.js';
+import { figurePoints, handTop } from './figure3d.js';
+import { simulate, aimAt, attackFlight, between } from './flight.js';
 import { posToModel, roleOfPos, DEFAULT_POSITIONS } from './library.js';
 import { state, on, emit, board, page, commit, touch, pageOrientation } from './store.js';
 import { renderOne } from './render.js';
@@ -175,6 +177,20 @@ function lerpEl(A, B, u) {
   for (const k of NUM) if (typeof A[k] === 'number' && typeof B[k] === 'number') o[k] = L(A[k], B[k]);
   if (A.type === 'player' || A.type === 'marker') o.size = L(A.size || 1, B.size || 1);
   // Netzansicht: Tiefe (fehlt sie in einem Schritt, gilt der Standard: Marker im Netz, Silhouetten knapp davor/dahinter)
+  if (A.type === 'sil') {
+    // Haltung weich überblenden, Blickrichtung auf kürzestem Weg drehen
+    const pa = A.pose || 'reach', pb = B.pose || 'reach';
+    if (pa !== pb) Object.assign(o, { poseA: pa, poseB: pb, poseT: u });
+    const fa = A.face ?? (A.team === 'opp' ? 180 : 0), fb = B.face ?? (B.team === 'opp' ? 180 : 0);
+    o.face = fa + ((((fb - fa + 180) % 360) + 360) % 360 - 180) * u;
+  }
+  if (A.type === 'marker' && B.traj && u > 0 && u < 1) {
+    // Ball auf der berechneten Flugkurve (Physik) statt geradlinig
+    const T = B.traj, n = T.length - 1, f2 = u * n, i = Math.min(n - 1, Math.floor(f2)), t = f2 - i;
+    const P0 = T[i], P1 = T[i + 1];
+    Object.assign(o, { x: P0[0] + (P1[0] - P0[0]) * t, y: -(P0[1] + (P1[1] - P0[1]) * t), d: P0[2] + (P1[2] - P0[2]) * t });
+    return o;
+  }
   if (A.type === 'marker' || A.type === 'sil') {
     const dd = (e) => (typeof e.d === 'number' ? e.d : e.type === 'sil' ? (e.team === 'opp' ? 0.9 : -0.6) : 0);
     if (typeof A.d === 'number' || typeof B.d === 'number') o.d = L(dd(A), dd(B));
@@ -413,44 +429,84 @@ const withOpp = (own, opp = {}) => ({ ...OPP, ...opp, ...own });
  * Sicht eines eigenen Spielers an der 3-m-Linie aufs Netz: x = Meter ab linker Seitenlinie, y = −Höhe.
  * Silhouetten: eigene vor dem Netz, Gegner (Block) dahinter. Ball = Indiaca-Marker.
  */
-function netExample(name, steps) {
+function netExample(name, steps, cam) {
   const pg = {
-    id: uid(), kind: 'anim', name, notes: '', elements: [], net: { preset: 'herren', view: '3d' },
+    id: uid(), kind: 'anim', name, notes: '', elements: [], net: { preset: 'herren', view: '3d', ...(cam ? { cam } : {}) },
     anim: { cur: 0, steps: steps.map((st) => ({ id: uid(), dur: st.dur || 1, note: st.note, els: Object.fromEntries(st.els.map((e) => [e.id, clone(e)])) })) },
   };
   netCfg(pg);
   load(pg, 0);
   return { id: 'ex-' + name, name, builtin: true, fieldType: 'indiaca', ownSide: 'left', page: pg };
 }
-const SIL = (id, x, sprung, extra) => ({ id, type: 'sil', y: 0, x, sprung, groesse: 1.85, team: 'own', color: '#2563eb', label: '', ...extra });
-const ZU = (x, sprung = 0) => SIL('n_zu', x, sprung, { label: '1. Zuspieler', short: 'Z', groesse: 1.8 });
-const BL = (id, x, sprung = 0) => SIL(id, x, sprung, { team: 'opp', color: '#dc2626', label: 'Block', short: 'B' });
-const BALL = (x, h, d = 0) => ({ id: 'n_ball', type: 'marker', symbol: 'indiaca', color: '#dc2626', label: '', size: 1, x, y: -h, d });
-const TP = (x, h, d = -0.3) => ({ id: 'n_tp', type: 'marker', symbol: 'x', color: '#ef4444', label: 'Treffpunkt', size: 1, x, y: -h, d });
-const UEB = (x, h) => ({ id: 'n_ueb', type: 'marker', symbol: 'ring', color: '#3b82f6', label: 'über die Netzkante', size: 1, x, y: -h, d: 0 });
-const LAND = (x, d) => ({ id: 'n_land', type: 'marker', symbol: 'dot', color: '#f59e0b', label: 'Aufprall', size: 1, x, y: -0.05, d });
-const FLUG2 = { id: 'n_flug2', type: 'link', a: 'n_ueb', b: 'n_land', color: '#ef4444', dashed: true };
-const FLUG = { id: 'n_flug', type: 'link', a: 'n_tp', b: 'n_ueb', color: '#ef4444', dashed: true };
+// Figuren-Bausteine (Gliederpuppen mit Haltung)
+const FIG = (id, x, d, pose, extra = {}) => ({ id, type: 'sil', y: 0, x, d, pose, sprung: 0, groesse: 1.85, team: 'own', color: '#2563eb', label: '', ...extra });
+const MK = (id, symbol, color, label, [x, h, d], extra = {}) => ({ id, type: 'marker', symbol, color, label, size: 1, x, y: -h, d, ...extra });
+const r3n = (v) => Math.round(v * 1000) / 1000;
+
+/**
+ * Angriff (Außen/Mitte × Line/Cross) als Netz-Animation mit Bewegungsphasen:
+ * Bereitschaft → Zuspiel/Anlauf → 2. Anlaufschritt → Stemmschritt → Absprung → Ausholen → Schlag → über die Netzkante → Aufprall.
+ * Treffpunkt = Hand der Figur; Zuspiel und Schlag sind mit Luftwiderstand berechnete Flugkurven.
+ */
+function attackAnim(zone, dir) {
+  const H = 2.35;
+  const cfg = {
+    aussen: { start: [0.5, -3.9], end: [1.05, -1.05], line: { land: [0.45, 0, 6.3], face: -6, block: [1.85, 2.65] }, cross: { land: [4.9, 0, 4.7], face: 24, block: [0.85, 1.65] }, att: { label: 'Außenangreifer', short: 'AA', groesse: 1.86 } },
+    mitte: { start: [3.45, -3.9], end: [3.0, -1.05], line: { land: [3.2, 0, 5.3], face: 0, block: [2.25, 3.95] }, cross: { land: [5.35, 0, 3.4], face: 26, block: [2.55, 3.3] }, att: { label: 'Hauptangreifer', short: 'HA', groesse: 1.9 } },
+  }[zone];
+  const v = cfg[dir];
+  const lerp2 = (t) => [cfg.start[0] + (cfg.end[0] - cfg.start[0]) * t, cfg.start[1] + (cfg.end[1] - cfg.start[1]) * t];
+  const setter = (pose) => FIG('n_zu', 4.65, -0.55, pose, { label: '1. Zuspieler', short: 'Z', groesse: 1.8, face: zone === 'aussen' ? -35 : -20 });
+  const att = (t, pose, sprung = 0, extra = {}) => { const [x, d] = lerp2(t); return FIG('n_att', r3n(x), r3n(d), pose, { ...cfg.att, sprung, face: 8 * (zone === 'aussen' ? 1 : 0), ...extra }); };
+  const blk = (i, x, pose, sprung = 0) => FIG(`n_b${i}`, x, 0.42, pose, { team: 'opp', color: '#dc2626', label: 'Block', short: 'B', sprung, face: 180 });
+  const blockMid = (v.block[0] + v.block[1]) / 2;
+  const bStart = [blockMid - 1.2, blockMid + 0.6];
+  const B = (pose, sprung, k = 1) => [blk(1, r3n(bStart[0] + (v.block[0] - bStart[0]) * k), pose, sprung), blk(2, r3n(bStart[1] + (v.block[1] - bStart[1]) * k), pose, sprung)];
+
+  // Haltungen + Positionen je Schritt (Angreifer, Zuspieler, Block)
+  const hitPose = dir === 'line' ? 'hitLine' : 'hitCross';
+  const hitAtt = att(1.0, hitPose, 0.6, { face: v.face });
+  // Treffpunkt aus der Hand der Figur (Gelenkkette) – die Indiaca trifft genau die Schlaghand
+  const hand = handTop(hitAtt, hitAtt.d);
+  const hit = [r3n(hand[0]), r3n(hand[1] + 0.04), r3n(hand[2] + 0.05)];
+  const setPose = setter('set');
+  const sp = figurePoints(setPose, setPose.d);
+  const setFrom = [(sp.tipL[0] + sp.tipR[0]) / 2, Math.max(sp.tipL[1], sp.tipR[1]) + 0.05, (sp.tipL[2] + sp.tipR[2]) / 2];
+
+  const dur = [0.6, 0.45, 0.35, 0.3, 0.22, 0.25, 0.15];
+  const tSet = dur[2] + dur[3] + dur[4] + dur[5] + dur[6]; // Zuspiel bis Treffpunkt
+  const setV = aimAt(setFrom, hit, tSet);
+  const setS = simulate(setFrom, setV, tSet);
+  const pass0 = [3.3, 2.6, -2.6];
+  const passS = simulate(pass0, aimAt(pass0, setFrom, dur[1]), dur[1]);
+  const shot = attackFlight(hit, v.land, H);
+  const ballAt = (S, t0, t1, n = 12) => between(S, t0, t1, n);
+  let t = 0;
+  const ballSeg = (t1) => { const tr = ballAt(setS, t, t1); t = t1; const q = tr[tr.length - 1]; return MK('n_ball', 'indiaca', '#dc2626', '', q, { traj: tr }); };
+  const tp = MK('n_tp', 'x', '#ef4444', 'Treffpunkt', hit);
+  const ueb = MK('n_ueb', 'ring', '#3b82f6', 'über die Netzkante', shot.net);
+  const land = MK('n_land', 'dot', '#f59e0b', 'Aufprall', [v.land[0], 0.03, v.land[2]]);
+  const flug1 = between(shot.samples, 0, shot.tNet, 16), flug2 = between(shot.samples, shot.tNet, shot.T, 16);
+  const full = between(shot.samples, 0, shot.T, 30);
+  const what = `${zone === 'aussen' ? 'Außenangriff' : 'Mittelangriff'} ${dir === 'line' ? 'Line' : 'Cross'}`;
+
+  const steps = [
+    { note: 'Annahme kommt zum 1. Zuspieler – Angreifer in Bereitschaft, Block wartet', dur: dur[0], els: [setter('setReady'), att(0, 'ready'), ...B('blockReady', 0, 0), MK('n_ball', 'indiaca', '#dc2626', '', pass0)] },
+    { note: 'Zuspiel – Angreifer startet den Anlauf (1. Schritt)', dur: dur[1], els: [setPose, att(0.32, 'run1'), ...B('blockReady', 0, 0.2), MK('n_ball', 'indiaca', '#dc2626', '', setFrom, { traj: ballAt(passS, 0, dur[1]) })] },
+    { note: '2. Anlaufschritt – Block liest das Zuspiel und verschiebt', dur: dur[2], els: [setter('cover'), att(0.62, 'run2'), ...B('blockStep', 0, 0.65), ballSeg(dur[2])] },
+    { note: 'Stemmschritt: langer letzter Schritt, Ferse zuerst, beide Arme schwingen nach hinten', dur: dur[3], els: [setter('cover'), att(0.92, 'plant'), ...B('blockReady', 0, 1), ballSeg(dur[2] + dur[3])] },
+    { note: 'Beidbeiniger Absprung – Armschwung nach oben', dur: dur[4], els: [setter('cover'), att(0.96, 'takeoff', 0.28), ...B('blockReady', 0.05, 1), ballSeg(dur[2] + dur[3] + dur[4])] },
+    { note: 'Ausholen: Schlagarm hinter den Kopf, Ellbogen hoch, Gegenarm zeigt zur Indiaca – Block springt', dur: dur[5], els: [setter('cover'), att(0.99, 'cock', 0.62), ...B('blockJump', 0.35, 1), ballSeg(tSet - dur[6])] },
+    { note: `Schlag ${dir === 'line' ? 'Line – gerade an der Linie entlang, am Block vorbei' : 'Cross – Oberkörper dreht in die Schlagrichtung, diagonal am Block vorbei'} (ca. ${shot.speed} km/h)`, dur: dur[6], els: [setter('cover'), hitAtt, ...B('blockJump', 0.5, 1), ballSeg(tSet), tp] },
+    { note: 'Die Indiaca geht über die Netzkante', dur: Math.max(0.15, r3n(shot.tNet)), els: [setter('cover'), att(1.02, 'follow', 0.3, { face: v.face }), ...B('blockJump', 0.42, 1), MK('n_ball', 'indiaca', '#dc2626', '', shot.net, { traj: flug1, trail: flug1 }), tp, ueb] },
+    { note: `Aufprall im gegnerischen Feld – Punkt! Landung beidbeinig mit gebeugten Knien`, dur: Math.max(0.3, r3n(shot.T - shot.tNet)), els: [setter('cover'), att(1.04, 'land', 0, { face: v.face }), ...B('land', 0, 1), MK('n_ball', 'indiaca', '#dc2626', '', [v.land[0], 0.03, v.land[2]], { traj: flug2, trail: full }), tp, ueb, land] },
+  ];
+  // schräg von hinten-seitlich und etwas erhöht: Anlauf, Absprung, Block und Flug im Blick
+  return netExample(`3D: ${what}`, steps, { az: zone === 'aussen' ? 0.62 : -0.55, el: 0.2, dist: 5.6, tx: zone === 'aussen' ? 1.6 : 3.2, ty: 1.5, tz: 0.2 });
+}
 
 function netExamples() {
-  const AA = (x, sprung = 0) => SIL('n_aa', x, sprung, { label: 'Außenangreifer', short: 'AA' });
-  const HA = (x, sprung = 0) => SIL('n_ha', x, sprung, { label: 'Hauptangreifer', short: 'HA', groesse: 1.9 });
-  return [
-    netExample('3D: Außenangriff', [
-      { note: '1. Zuspieler nimmt die Indiaca – Außenangreifer startet links', els: [ZU(4.7), AA(1.5), BL('n_b1', 3.8), BL('n_b2', 2.7), BALL(4.6, 2.3, -0.5)] },
-      { note: 'Hohes Zuspiel nach außen – der Block verschiebt mit', dur: 1.2, els: [ZU(4.7, 0.15), AA(1.15), BL('n_b1', 2.5), BL('n_b2', 1.7), BALL(2.8, 3.6, -0.6)] },
-      { note: 'Absprung – Treffpunkt hoch über der Netzkante', els: [ZU(4.6), AA(1.0, 0.6), BL('n_b1', 2.3, 0.45), BL('n_b2', 1.55, 0.5), BALL(1.19, 3.06, -0.3), TP(1.19, 3.06)] },
-      { note: 'Schlag an der Linie entlang – am Block vorbei über die Netzkante', dur: 0.6, els: [ZU(4.6), AA(1.0, 0.1), BL('n_b1', 2.3, 0.2), BL('n_b2', 1.55, 0.25), BALL(0.5, 2.5, 0), TP(1.19, 3.06), UEB(0.5, 2.5), FLUG] },
-      { note: 'Die Indiaca schlägt tief im gegnerischen Feld an der Linie auf', dur: 0.8, els: [ZU(4.6), AA(1.0), BL('n_b1', 2.3), BL('n_b2', 1.55), BALL(0.3, 0.05, 5.5), TP(1.19, 3.06), UEB(0.5, 2.5), LAND(0.3, 5.5), FLUG, FLUG2] },
-    ]),
-    netExample('3D: Mittelangriff', [
-      { note: '1. Zuspieler mit der Indiaca – Hauptangreifer läuft in der Mitte an', els: [ZU(4.7), HA(3.1), BL('n_b1', 3.2), BL('n_b2', 4.2), BALL(4.6, 2.3, -0.5)] },
-      { note: 'Schnelles, kurzes Zuspiel in die Mitte', dur: 0.8, els: [ZU(4.7, 0.1), HA(3.0, 0.35), BL('n_b1', 3.1, 0.1), BL('n_b2', 3.9), BALL(3.6, 2.95, -0.45)] },
-      { note: 'Absprung – Schlag, bevor der Block steht', dur: 0.7, els: [ZU(4.7), HA(3.0, 0.7), BL('n_b1', 3.0, 0.35), BL('n_b2', 3.7, 0.2), BALL(3.19, 3.23, -0.3), TP(3.19, 3.23)] },
-      { note: 'Steil über die Netzkante zwischen die Blockhände', dur: 0.4, els: [ZU(4.7), HA(3.0, 0.1), BL('n_b1', 3.0, 0.45), BL('n_b2', 3.7, 0.4), BALL(2.55, 2.48, 0), TP(3.19, 3.23), UEB(2.55, 2.48), FLUG] },
-      { note: 'Kurz hinter dem Block im gegnerischen Feld – Punkt', dur: 0.5, els: [ZU(4.7), HA(3.0), BL('n_b1', 3.0), BL('n_b2', 3.7), BALL(2.2, 0.05, 2.6), TP(3.19, 3.23), UEB(2.55, 2.48), LAND(2.2, 2.6), FLUG, FLUG2] },
-    ]),
-  ];
+  return [attackAnim('aussen', 'line'), attackAnim('aussen', 'cross'), attackAnim('mitte', 'line'), attackAnim('mitte', 'cross')];
 }
 
 export function exampleTemplates() {

@@ -620,6 +620,20 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 .el.sil.opp .sil-lbl { opacity: .7; }
 #stage-wrap.anim.net #anim-note { top: 70px; }
 
+#net3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; display: none; background: var(--table); touch-action: none; cursor: grab; }
+#net3d.show { display: block; }
+#stage-wrap.anim #net3d { height: calc(100% - 120px); }
+#net3d-hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 4; display: none; pointer-events: none; font-size: 13px; color: var(--muted); background: var(--panel); padding: 6px 12px; border-radius: 99px; border: 1px solid var(--border); white-space: nowrap; }
+#stage-wrap.net3d:not(.anim) #net3d-hint { display: block; }
+#stage-wrap.net3d #hint, #stage-wrap.net3d #selbar, #stage-wrap.net3d #net-readout { display: none !important; }
+.nv3-mesh { fill: rgba(15, 23, 42, .22); }
+.nv3-ml { stroke: rgba(15, 23, 42, .35); stroke-width: 0.0015; }
+.nv3-band { stroke: #fff; stroke-width: 0.008; }
+.nv3-post { stroke: #475569; stroke-width: 0.012; stroke-linecap: round; }
+.nv3-ant { stroke-width: 0.006; } .nv3-ant.r { stroke: #dc2626; } .nv3-ant.w { stroke: #fff; }
+.nv3-lbl { font-size: 0.035px; font-weight: 800; fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.55); stroke-width: 0.008; }
+.nb-view .seg-btn { height: 44px; font-size: 13px; padding: 0 10px; }
+
 /* ---------- Kleine Bildschirme ---------- */
 @media (max-width: 820px) {
   #main { grid-template-columns: 100px minmax(0, 1fr) 0; }

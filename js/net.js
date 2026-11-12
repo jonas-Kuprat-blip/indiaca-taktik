@@ -26,6 +26,7 @@ export function netCfg(p) {
   if (!(n.hoehe > 0.5 && n.hoehe < 4)) n.hoehe = DEFAULT_NET_HEIGHTS.herren;
   n.hilfslinien = !!n.hilfslinien;
   n.einrasten = !!n.einrasten;
+  n.view = n.view === '3d' ? '3d' : '2d';
   if (!n.legende || typeof n.legende !== 'object') n.legende = { ...DEFAULT_LEGEND };
   return n;
 }

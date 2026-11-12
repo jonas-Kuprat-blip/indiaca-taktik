@@ -8,7 +8,8 @@ import { posToModel, sideOf, roleOfPos, roleAtPos } from './library.js';
 import { teamRot, assignMissingRoles } from './rotation.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox, ui as renderUi } from './render.js';
 import { strokePath } from './stroke.js';
-import { isNet, netH, snapToNet, readoutText, makeSil } from './net.js';
+import { isNet, netH, netCfg, snapToNet, readoutText, makeSil } from './net.js';
+import { render3d, VIEWBOX_3D } from './net3d.js';
 import { FIELDS } from './model.js';
 import { I } from './icons.js';
 
@@ -23,7 +24,8 @@ import { I } from './icons.js';
  */
 
 let gGhost;
-let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar, rotpanel, rotInput, rotLabel, rotBtn, readout;
+let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar, rotpanel, rotInput, rotLabel, rotBtn, readout, v3;
+let yaw3 = 0;
 let linkFrom = null; // Netzansicht: „Linie zu …“ – erster Marker
 export function startLink(id) {
   linkFrom = id;
@@ -106,6 +108,26 @@ export function initStage(wrap) {
   readout = document.createElement('div');
   readout.id = 'net-readout';
   wrap.append(readout);
+  // 3D-Perspektive der Netzansicht (nur Anzeige; Wischen schwenkt die Kamera)
+  v3 = document.createElementNS(NS, 'svg');
+  v3.id = 'net3d';
+  v3.setAttribute('viewBox', VIEWBOX_3D);
+  v3.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  const v3hint = document.createElement('div');
+  v3hint.id = 'net3d-hint';
+  v3hint.textContent = '3D: wischen zum Schwenken · Doppeltipp = gerade · Bearbeiten in 2D';
+  wrap.append(v3, v3hint);
+  let drag3 = null;
+  v3.addEventListener('pointerdown', (e) => { drag3 = { x: e.clientX, yaw: yaw3 }; try { v3.setPointerCapture(e.pointerId); } catch {} });
+  v3.addEventListener('pointermove', (e) => {
+    if (!drag3) return;
+    yaw3 = Math.max(-0.45, Math.min(0.45, drag3.yaw - (e.clientX - drag3.x) / 500));
+    draw3d();
+  });
+  const end3 = () => (drag3 = null);
+  v3.addEventListener('pointerup', end3);
+  v3.addEventListener('pointercancel', end3);
+  v3.addEventListener('dblclick', () => { yaw3 = 0; draw3d(); });
   trash = document.createElement('div');
   trash.id = 'trash';
   trash.setAttribute('aria-label', 'Zum Löschen hierher ziehen');
@@ -247,9 +269,22 @@ export function redraw() {
   drawEls();
 }
 
+let raf3 = 0;
+function draw3d(pg) {
+  const p = page();
+  const on3 = !!p && isNet(p) && netCfg(p).view === '3d';
+  v3.classList.toggle('show', on3);
+  v3.parentElement.classList.toggle('net3d', on3);
+  if (!on3) return;
+  const src = pg || (frameOverride ? frameOverride() : p);
+  cancelAnimationFrame(raf3);
+  raf3 = requestAnimationFrame(() => (v3.innerHTML = render3d(src, board(), yaw3)));
+}
+
 function drawEls() {
   renderUi.showPos = !!state.showPosNumbers;
   const pg = frameOverride ? frameOverride() : page();
+  draw3d(pg);
   gEls.innerHTML = renderElements(pg, board(), rot());
   gGhost.innerHTML = ghostRenderer ? ghostRenderer(rot()) : '';
   drawSel();

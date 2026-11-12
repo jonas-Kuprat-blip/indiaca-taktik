@@ -12,6 +12,7 @@ export function initNetBar(wrap) {
   const save = () => {
     touch();
     emit('page');
+    emit('elements');
   };
   const render = () => {
     const p = page();
@@ -53,7 +54,9 @@ export function initNetBar(wrap) {
             },
           }, h('i', { style: { background: colorCss(c) } }), legendLabel(p, c) || 'Bedeutung?')))
       : null;
-    bar.replaceChildren(...[h('span', { class: 'nb-t' }, 'Netz'), sel, man, tog('hilfslinien', 'Hilfslinien'), tog('einrasten', 'Am Netz einrasten'), legend].filter(Boolean));
+    const view = h('div', { class: 'seg nb-view', role: 'group', 'aria-label': 'Ansicht' },
+      [['2d', '2D frontal'], ['3d', '3D Perspektive']].map(([k, l]) => h('button', { class: 'seg-btn' + (cfg.view === k ? ' active' : ''), onclick: () => { cfg.view = k; save(); } }, l)));
+    bar.replaceChildren(...[view, h('span', { class: 'nb-t' }, 'Netz'), sel, man, tog('hilfslinien', 'Hilfslinien'), tog('einrasten', 'Am Netz einrasten'), legend].filter(Boolean));
   };
   on(['page', 'board', 'elements'], render);
   render();

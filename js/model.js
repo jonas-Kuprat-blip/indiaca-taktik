@@ -65,7 +65,7 @@ export function clampPlayer(el, fieldType, ownSide = 'left') {
  * Freihand-Striche sind nicht animiert und bleiben über alle Schritte stehen.
  * page.anim = { steps: [{ id, note, dur, els: { [id]: element } }], cur }
  */
-export const ANIM_TYPES = ['player', 'marker', 'zone', 'arrow'];
+export const ANIM_TYPES = ['player', 'marker', 'zone', 'arrow', 'sil', 'link'];
 export function ensureAnim(p) {
   const a = (p.anim ||= {});
   if (!Array.isArray(a.steps) || !a.steps.length) a.steps = [{ id: uid(), note: '', dur: 1, els: {} }];

@@ -1,5 +1,5 @@
 import { FIELDS } from './model.js';
-import { lib } from './library.js';
+import { lib, playerById, sideOf } from './library.js';
 import { esc, colorCss, uid } from './util.js';
 import { state } from './store.js';
 
@@ -79,7 +79,7 @@ export function renderNetField(b, p) {
     for (let y = yb, i = 0; y > yt + 0.001; y -= 0.1, i++)
       s += `<line class="nv-ant ${i % 2 ? 'w' : 'r'}" x1="${ax}" x2="${ax}" y1="${f(y)}" y2="${f(Math.max(yt, y - 0.1))}"/>`;
   }
-  s += `<text class="nv-lbl" x="${f(W - 0.08)}" y="${f(-H - 0.14)}" text-anchor="end">Netz ${fmtM(H)}</text>`;
+  s += `<text class="nv-lbl" x="0.12" y="${f(-H + 0.2)}">Netz ${fmtM(H)}</text>`;
   // Höhenskala links: 10-cm-Striche, alle 50 cm beschriftet
   const sx = -0.62;
   s += `<line class="nv-scale" x1="${sx}" x2="${sx}" y1="0" y2="${f(y0 + 0.15)}"/>`;
@@ -131,4 +131,65 @@ export function makeNetPage(name) {
   const p = { id: uid(), kind: 'netz', name: name || `Netz ${n + 1}`, elements: [], notes: '', net: {} };
   netCfg(p);
   return p;
+}
+
+// ---------- Silhouetten ----------
+/*
+ * Silhouette: { id, type: 'sil', x, groesse (m), sprung (m), team, color, label, rosterId? }
+ * Füße bei Höhe = sprung; Reichhöhe (gestreckter Arm) ≈ 1,33 × Körpergröße + Sprung.
+ */
+export const REACH = 1.33;
+export const DEFAULT_SIZE = 1.8;
+export const reachOf = (el) => (el.groesse || DEFAULT_SIZE) * REACH + (el.sprung || 0);
+export const playerSize = (pl) => (pl?.groesse ? pl.groesse / 100 : DEFAULT_SIZE);
+
+export function makeSil({ x, team = 'own', color, label = '', short = '', rosterId, groesse, sprung = 0 }) {
+  return {
+    id: rosterId ? 's_' + rosterId : uid(), type: 'sil', x: Math.round(x * 100) / 100, y: 0, team, color: color || (team === 'opp' ? '#dc2626' : '#2563eb'),
+    label, ...(short ? { short } : {}), ...(rosterId ? { rosterId } : {}), groesse: groesse || DEFAULT_SIZE, sprung,
+  };
+}
+
+/** Spieler der vorderen Reihe einer Feldseite → Silhouetten an ihrer seitlichen Position (Sicht des eigenen Teams) */
+export function silsFromField(src, b) {
+  const F = FIELDS[b.fieldType] || FIELDS.indiaca;
+  const W = F.width;
+  const own = sideOf(b, 'own');
+  const out = [];
+  for (const e of src.elements) {
+    if (e.type !== 'player' || Math.abs(e.x) > F.attack + 0.3) continue;
+    // eigenes Team links schaut nach +x (rechte Hand = +y) → von links gesehen x = W/2 + y
+    const xv = own === 'left' ? W / 2 + e.y : W / 2 - e.y;
+    const pl = e.rosterId && playerById(e.rosterId);
+    out.push(makeSil({ x: Math.max(-0.3, Math.min(W + 0.3, xv)), team: e.team, color: e.color, label: e.label || '', short: e.short || pl?.kuerzel || '', rosterId: e.rosterId, groesse: playerSize(pl) }));
+  }
+  return out;
+}
+
+/** Silhouette zeichnen (Koordinaten in Metern, y nach oben negativ) */
+export function silMarkup(el, sel = false) {
+  const H = el.groesse || DEFAULT_SIZE, j = el.sprung || 0;
+  const k = (n) => f(n * H);
+  const fy = -j; // Füße
+  const Y = (t) => f(fy - t * H); // Höhe als Anteil der Körpergröße
+  const x = el.x, c = colorCss(el.color || '#2563eb');
+  const opp = el.team === 'opp';
+  const lw = k(0.075), aw = k(0.06);
+  const reach = reachOf(el);
+  const body =
+    `<path d="M${f(x - 0.06 * H)} ${Y(0.82)}L${f(x + 0.06 * H)} ${Y(0.82)}L${f(x + 0.05 * H)} ${Y(0.5)}L${f(x - 0.05 * H)} ${Y(0.5)}Z" style="fill:${c};stroke:${c};stroke-width:${k(0.05)};stroke-linejoin:round"/>` +
+    `<circle cx="${f(x)}" cy="${Y(0.925)}" r="${k(0.062)}" style="fill:${c}"/>` +
+    // Beine
+    `<path d="M${f(x - 0.03 * H)} ${Y(0.5)}L${f(x - 0.06 * H)} ${Y(0)}M${f(x + 0.03 * H)} ${Y(0.5)}L${f(x + 0.06 * H)} ${Y(0)}" style="stroke:${c};stroke-width:${lw};stroke-linecap:round;fill:none"/>` +
+    // Schlagarm gestreckt nach oben (Reichhöhe), anderer Arm angewinkelt
+    `<path d="M${f(x + 0.07 * H)} ${Y(0.8)}L${f(x + 0.1 * H)} ${f(-reach + 0.035 * H)}" style="stroke:${c};stroke-width:${aw};stroke-linecap:round;fill:none"/>` +
+    `<path d="M${f(x - 0.07 * H)} ${Y(0.8)}L${f(x - 0.17 * H)} ${Y(0.66)}L${f(x - 0.12 * H)} ${Y(0.86)}" style="stroke:${c};stroke-width:${aw};stroke-linecap:round;stroke-linejoin:round;fill:none"/>`;
+  const handX = x + 0.1 * H;
+  const tick = `<line x1="${f(handX - 0.18)}" x2="${f(handX + 0.18)}" y1="${f(-reach)}" y2="${f(-reach)}" class="sil-reach"/>`;
+  const nm = el.short || (el.label || '').split(/\s+/)[0] || '';
+  const label = `<text class="sil-lbl" x="${f(handX)}" y="${f(-reach - 0.1)}" text-anchor="middle">${nm ? `<tspan class="sil-nm">${esc(nm)}</tspan> ` : ''}${fmtM(reach)}</text>`;
+  const shadow = j > 0.01 ? `<ellipse cx="${f(x)}" cy="0.02" rx="${k(0.12)}" ry="0.03" class="sil-shadow"/>` : '';
+  const hit = `<rect class="hit-a" x="${f(x - 0.25 * H)}" y="${f(-reach - 0.1)}" width="${k(0.5)}" height="${f(reach + 0.15)}"/>`;
+  return `<g class="el sil${opp ? ' opp' : ''}" data-id="${el.id}">${hit}${shadow}<g class="sil-b"${opp ? ' style="opacity:.5"' : ''}>${body}</g>${tick}${label}${
+    sel ? `<rect class="sel" x="${f(x - 0.27 * H)}" y="${f(-reach - 0.12)}" width="${k(0.54)}" height="${f(reach + 0.15)}"/>` : ''}</g>`;
 }

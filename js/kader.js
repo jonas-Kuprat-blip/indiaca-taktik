@@ -8,6 +8,7 @@ import {
 import { modal, choose, toast } from './ui/dialogs.js';
 import { openStats } from './ui/stats.js';
 import { teamRot } from './rotation.js';
+import { isNet, makeSil, playerSize } from './net.js';
 import { setupEditor, writeSetup, placeSetup, boardSetupSection } from './ui/setup.js';
 
 /*
@@ -71,6 +72,17 @@ export async function placeRosterPlayer(pid) {
   const b = board();
   const p = playerById(pid);
   if (!p) return;
+  if (isNet(page())) {
+    // Netzansicht: Silhouette in Körpergröße
+    if (page().elements.some((e) => e.type === 'sil' && e.rosterId === pid)) return toast(`${p.name} ist schon da`);
+    const team = teamForPlayer(b, pid) || 'own';
+    const W = (FIELDS[b.fieldType] || FIELDS.indiaca).width;
+    const n = page().elements.filter((e) => e.type === 'sil').length;
+    const sil = makeSil({ x: ((n % 5) + 1) * (W / 6), team, color: teamColor(b, team), label: p.name, short: p.kuerzel, rosterId: p.id, groesse: playerSize(p) });
+    commit((pg) => pg.elements.push(sil));
+    select(sil.id);
+    return;
+  }
   const onPage = page().elements.find((e) => e.type === 'player' && e.rosterId === pid);
   if (onPage) {
     select(onPage.id);

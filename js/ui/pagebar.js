@@ -6,10 +6,10 @@ import {
   movePage, commit, setHalf, setOrientation, pageOrientation, saveTemplate, pageFromTemplate, renameTemplate, deleteTemplate,
 } from '../store.js';
 import { thumbSVG } from '../render.js';
-import { makeAnimPage, exampleTemplates } from '../anim.js';
-import { makeNetPage } from '../net.js';
+import { makeAnimPage, makeNetAnimPage, exampleTemplates } from '../anim.js';
+import { makeNetPage, silsFromField, isNet } from '../net.js';
 import { pageFromTpl } from '../kader.js';
-import { menu, modal, promptText, confirmDlg, toast } from './dialogs.js';
+import { menu, modal, promptText, confirmDlg, toast, choose } from './dialogs.js';
 
 let list;
 
@@ -33,7 +33,7 @@ function renderAll() {
     ...b.pages.map((p) =>
       h('div', { class: 'thumb' + (p.id === state.pageId ? ' active' : ''), 'data-id': p.id },
         h('div', { class: 'thumb-svg', html: thumbSVG(p, b) }),
-        h('div', { class: 'thumb-name' }, p.kind === 'angabe' ? h('span', { class: 'badge' }, 'A') : null, p.kind === 'anim' ? h('span', { class: 'badge anim' }, '▶') : null, p.kind === 'netz' ? h('span', { class: 'badge net', html: I.net, title: 'Netzansicht' }) : null, p.half ? h('span', { class: 'badge half' }, '½') : null, p.name)))
+        h('div', { class: 'thumb-name' }, p.kind === 'angabe' ? h('span', { class: 'badge' }, 'A') : null, p.kind === 'anim' ? h('span', { class: 'badge anim' }, '▶') : null, p.kind === 'anim' && p.net ? h('span', { class: 'badge net', html: I.net }) : null, p.kind === 'netz' ? h('span', { class: 'badge net', html: I.net, title: 'Netzansicht' }) : null, p.half ? h('span', { class: 'badge half' }, '½') : null, p.name)))
   );
   list.querySelector('.thumb.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
@@ -126,6 +126,23 @@ function pageMenu(anchor) {
   ]);
 }
 
+/** Netzansicht anlegen: leer, mit Spielern der aktuellen Seite oder als Animation */
+async function newNetPage() {
+  const src = page();
+  const front = !isNet(src) ? silsFromField(src, board()) : [];
+  const opts = [
+    { id: 'leer', label: 'Leer', sub: 'Nur Netz und Höhenskala', primary: !front.length },
+    front.length ? { id: 'feld', label: 'Zur aktuellen Seite', sub: `${front.length} Spieler der vorderen Reihe als Silhouetten übernehmen`, primary: true } : null,
+    { id: 'anim', label: 'Als Animation', sub: 'Marker und Silhouetten Schritt für Schritt' + (front.length ? ' (mit Spielern der aktuellen Seite)' : '') },
+  ].filter(Boolean);
+  const r = await choose('Netzansicht', 'Blick eines Spielers aufs Netz.', opts);
+  if (!r) return;
+  if (r === 'anim') return addPage(makeNetAnimPage(front));
+  const p = makeNetPage();
+  if (r === 'feld') p.elements = front;
+  addPage(p);
+}
+
 export function newPageDialog() {
   const tplBox = h('div', { class: 'tpl-list' });
   let m;
@@ -160,7 +177,7 @@ export function newPageDialog() {
         opt(I.half, 'Eigene Feldhälfte', 'Nur unsere Hälfte, größer', () => addPage(makePage('taktik', true))),
         opt(I.serve, 'Angabe-Seite', 'Ziele mit Kreuzen', () => addPage(makePage('angabe'))),
         opt(I.anim, 'Animation', 'Spielzug Schritt für Schritt', () => addPage(makeAnimPage())),
-        opt(I.net, 'Netzansicht', 'Blick aufs Netz: Höhen, Treffpunkte', () => addPage(makeNetPage())),
+        opt(I.net, 'Netzansicht', 'Blick aufs Netz: Höhen, Treffpunkte', () => newNetPage()),
         opt(I.copy, 'Kopie dieser Seite', page().name, copyCurrentPage)),
       h('h3', {}, 'Beispiel-Animationen'),
       h('div', { class: 'tpl-list' }, exampleTemplates().map((t) =>

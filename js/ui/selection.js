@@ -3,7 +3,7 @@ import { I } from '../icons.js';
 import { COLORS, clampPlayer } from '../model.js';
 import { state, on, findEl, page, board, commit, snapshot, changed, select, scale } from '../store.js';
 import { colorPicker } from './dialogs.js';
-import { isNet, readoutText } from '../net.js';
+import { isNet, readoutText, fmtM, reachOf } from '../net.js';
 import { startLink, linkPending } from '../stage.js';
 
 /** Schwebende Leiste über dem Feld für das ausgewählte Element */
@@ -74,10 +74,7 @@ export function initSelectionBar(wrap) {
         const cx = el.vee ? el.points[1][0] : el.points.reduce((a, p) => a + p[0], 0) / el.points.length;
         const cy = el.vee ? el.points[1][1] : el.points.reduce((a, p) => a + p[1], 0) / el.points.length;
         el.points = el.points.map(([x, y]) => [Math.round((cx + (x - cx) * k) * 1000) / 1000, Math.round((cy + (y - cy) * k) * 1000) / 1000]);
-      } else if (el.type === 'link') {
-      parts.push(lbl('Linie'), swatches(el),
-        h('button', { class: 'btn' + (el.dashed !== false ? ' active' : ''), html: I.dash, 'aria-label': 'Gestrichelt', onclick: () => commit(() => (findEl(el.id).dashed = el.dashed === false)) }));
-    } else if (el.type === 'arrow') {
+      } else if (el.type === 'arrow') {
         const mx = (el.x1 + el.x2) / 2, my = (el.y1 + el.y2) / 2;
         el.x1 = mx + (el.x1 - mx) * k; el.y1 = my + (el.y1 - my) * k;
         el.x2 = mx + (el.x2 - mx) * k; el.y2 = my + (el.y2 - my) * k;
@@ -144,6 +141,15 @@ export function initSelectionBar(wrap) {
         h('button', { class: 'btn', html: I.turnL, 'aria-label': 'Links drehen', title: 'Links drehen', onclick: () => turn(-15) }),
         h('button', { class: 'btn', html: I.turnR, 'aria-label': 'Rechts drehen', title: 'Rechts drehen', onclick: () => turn(15) })] : [];
       parts.push(...sizeBtns(el), ...rotBtns, swatches(el), lbl('Deckkraft'), r, dup(el));
+    } else if (el.type === 'sil') {
+      parts.push(
+        lbl('Größe ' + fmtM(el.groesse || 1.8)), slider(el, 'groesse', '1.3', '2.2', '0.01', 'Körpergröße', 1.8),
+        lbl('Sprung ' + fmtM(el.sprung || 0)), slider(el, 'sprung', '0', '1.1', '0.01', 'Sprunghöhe', 0),
+        h('span', { class: 'sel-lbl net-h' }, 'Reichhöhe ' + fmtM(reachOf(el))),
+        textInput(el, 'label', 'Name', 10), swatches(el));
+    } else if (el.type === 'link') {
+      parts.push(lbl('Linie'), swatches(el),
+        h('button', { class: 'btn' + (el.dashed !== false ? ' active' : ''), html: I.dash, 'aria-label': 'Gestrichelt', onclick: () => commit(() => (findEl(el.id).dashed = el.dashed === false)) }));
     } else if (el.type === 'arrow') {
       parts.push(...sizeBtns(el), swatches(el),
         h('button', { class: 'btn' + (el.dashed ? ' active' : ''), html: I.dash, 'aria-label': 'Gestrichelt', onclick: () => commit(() => (findEl(el.id).dashed = !el.dashed)) }),

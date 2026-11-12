@@ -74,6 +74,7 @@ export function editPlayer(id, { onSaved } = {}) {
   const name = h('input', { class: 'input', value: p?.name || '', placeholder: 'Vor- und Nachname', autocomplete: 'off' });
   const kz = h('input', { class: 'input', value: p?.kuerzel || '', placeholder: 'z. B. JK', maxlength: 4, autocomplete: 'off' });
   const nr = h('input', { class: 'input', value: p?.nummer ?? '', placeholder: 'optional', inputmode: 'numeric', maxlength: 3 });
+  const gr = h('input', { class: 'input', value: p?.groesse ?? '', placeholder: 'optional, z. B. 182', inputmode: 'numeric', maxlength: 3, 'aria-label': 'Körpergröße in cm' });
   let kzTouched = !!p;
   kz.addEventListener('input', () => (kzTouched = true));
   name.addEventListener('input', () => { if (!kzTouched) kz.value = initials(name.value); });
@@ -91,6 +92,7 @@ export function editPlayer(id, { onSaved } = {}) {
     body: h('div', { class: 'form' },
       field('Name', name),
       h('div', { class: 'form-2' }, field('Kürzel (auf der Figur)', kz), field('Rückennummer', nr)),
+      field('Körpergröße in cm (für die Netzansicht)', gr),
       h('div', { class: 'form-row' }, h('span', {}, 'Standardrolle'), posBox)),
     actions: [
       { label: 'Abbrechen' },
@@ -99,7 +101,8 @@ export function editPlayer(id, { onSaved } = {}) {
         onClick: () => {
           const n = name.value.trim();
           if (!n) { name.focus(); return false; }
-          const data = { name: n, kuerzel: kz.value.trim() || initials(n), nummer: nr.value.trim(), stdPos: pos };
+          const g = parseInt(gr.value, 10);
+          const data = { name: n, kuerzel: kz.value.trim() || initials(n), nummer: nr.value.trim(), stdPos: pos, groesse: g >= 100 && g <= 250 ? g : null };
           const saved = p ? (updatePlayer(p.id, data), playerById(p.id)) : addPlayer(data);
           onSaved && onSaved(saved);
         },

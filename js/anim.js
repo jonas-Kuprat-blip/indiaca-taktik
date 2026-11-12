@@ -1,6 +1,7 @@
 import { h, uid, clone } from './util.js';
 import { I } from './icons.js';
 import { FIELDS, newPage, ensureAnim, ANIM_TYPES } from './model.js';
+import { isNet, netCfg } from './net.js';
 import { posToModel, roleOfPos, DEFAULT_POSITIONS } from './library.js';
 import { state, on, emit, board, page, commit, touch, pageOrientation } from './store.js';
 import { renderOne } from './render.js';
@@ -108,9 +109,32 @@ const moveStep = (i, d) =>
     load(p, j);
   });
 
+/** Netz-Animation: Netzansicht mit Schritten (Marker, Linien und Silhouetten werden interpoliert) */
+export function makeNetAnimPage(sils = []) {
+  const src = page();
+  const n = board().pages.filter((p) => p.kind === 'anim' && p.net).length + 1;
+  const p = newPage('anim', `Netz-Animation ${n}`);
+  if (isNet(src)) {
+    // aus einer Netzansicht: Marker, Silhouetten, Linien übernehmen (IDs neu, Linien umhängen)
+    const map = {};
+    const els = src.elements.filter((e) => ['marker', 'sil', 'link'].includes(e.type));
+    for (const e of els) map[e.id] = e.type === 'sil' && e.rosterId ? e.id : uid();
+    p.elements = els.map((e) => ({ ...clone(e), id: map[e.id], ...(e.type === 'link' ? { a: map[e.a], b: map[e.b] } : {}) }));
+    p.net = clone(netCfg(src));
+  } else {
+    p.elements = clone(sils);
+    p.net = {};
+    netCfg(p);
+  }
+  ensureAnim(p);
+  capture(p);
+  return p;
+}
+
 /** Neue Animationsseite – Spieler und Marker (z. B. Indiaca) der aktuellen Seite werden zu Schritt 1 */
 export function makeAnimPage() {
   const src = page();
+  if (isNet(src)) return makeNetAnimPage();
   const n = board().pages.filter((p) => p.kind === 'anim').length + 1;
   const p = newPage('anim', `Animation ${n}`);
   p.elements = src.elements.filter((e) => e.type === 'player' || e.type === 'marker').map((e) => ({ ...clone(e), id: uid() }));
@@ -144,7 +168,7 @@ function at(a, t) {
 const startOf = (a, i) => (i <= 0 ? 0 : timeline(a).segs[i - 1].t0 + HOLD + a.steps[i].dur);
 
 /** Zwischenstand zweier Elemente (Position, Größe, Form, Deckkraft); Farbe/Symbol wechseln zur Hälfte */
-const NUM = ['x', 'y', 'r', 'opacity', 'x1', 'y1', 'x2', 'y2', 'width'];
+const NUM = ['x', 'y', 'r', 'opacity', 'x1', 'y1', 'x2', 'y2', 'width', 'sprung', 'groesse'];
 function lerpEl(A, B, u) {
   const o = { ...(u < 0.5 ? A : B) };
   const L = (p, q) => p + (q - p) * u;

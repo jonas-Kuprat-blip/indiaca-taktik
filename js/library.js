@@ -101,7 +101,7 @@ function applyLibrary(d) {
     if (typeof rn === 'string' && rn.trim()) lib.roles[n] = rn.trim();
   }
 }
-const normPlayer = (p) => ({ id: p.id, name: String(p.name).trim(), kuerzel: (p.kuerzel || initials(p.name)).slice(0, 4), nummer: p.nummer ?? '', stdPos: POS_NUMS.includes(+p.stdPos) ? +p.stdPos : null, ...(p.extern ? { extern: true } : {}) });
+const normPlayer = (p) => ({ id: p.id, name: String(p.name).trim(), kuerzel: (p.kuerzel || initials(p.name)).slice(0, 4), nummer: p.nummer ?? '', stdPos: POS_NUMS.includes(+p.stdPos) ? +p.stdPos : null, ...(p.extern ? { extern: true } : {}), ...(+p.groesse >= 100 && +p.groesse <= 250 ? { groesse: Math.round(+p.groesse) } : {}) });
 function normSquad(s) {
   return {
     id: s.id, name: s.name || 'Mannschaft', farbe: s.farbe || '#2563eb', typ: s.typ === 'gegner' ? 'gegner' : 'eigen',
@@ -203,6 +203,16 @@ export function updatePlayer(id, patch) {
     e.label = p.name;
     e.short = p.kuerzel;
   });
+  // Silhouetten in Netzansichten (inkl. Animationsschritte)
+  for (const b of state.boards) for (const pg of b.pages) {
+    const lists = [pg.elements, ...(pg.anim?.steps || []).map((s) => Object.values(s.els || {}))];
+    for (const list of lists) for (const e of list) if (e.type === 'sil' && e.rosterId === id) {
+      e.label = p.name;
+      e.short = p.kuerzel;
+      if (p.groesse) e.groesse = p.groesse / 100;
+      touch(b);
+    }
+  }
   libChanged();
 }
 export function deletePlayer(id, { archive = false } = {}) {

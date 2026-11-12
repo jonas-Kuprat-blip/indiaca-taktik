@@ -86,7 +86,11 @@ export function initPalette(root) {
   const secs = (n) => root.querySelector(`.pal-sec[data-sec="${n}"]`) || document.querySelector(`.pal-sec[data-sec="${n}"]`);
   const syncKind = () => {
     const net = isNet(page());
-    for (const n of ['spieler', 'kader', 'ziel']) { const el = secs(n); if (el) el.style.display = net ? 'none' : ''; }
+    const z = secs('ziel');
+    if (z) z.style.display = net ? 'none' : '';
+    // Netzansicht: Spieler/Kader setzen Silhouetten
+    for (const n of ['spieler', 'kader']) { const h2 = secs(n)?.querySelector('.pal-h'); if (h2) h2.textContent = net ? (n === 'spieler' ? 'Silhouetten' : 'Kader → Silhouette') : (n === 'spieler' ? 'Spieler' : 'Kader'); }
+    insertBtn.style.display = net ? 'none' : '';
     const ne = secs('netz');
     if (ne) ne.style.display = net ? '' : 'none';
     renderNetColors();

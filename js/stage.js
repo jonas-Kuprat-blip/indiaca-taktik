@@ -8,7 +8,8 @@ import { posToModel, sideOf, roleOfPos, roleAtPos } from './library.js';
 import { teamRot, assignMissingRoles } from './rotation.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox, ui as renderUi } from './render.js';
 import { strokePath } from './stroke.js';
-import { isNet, netH, snapToNet, readoutText } from './net.js';
+import { isNet, netH, snapToNet, readoutText, makeSil } from './net.js';
+import { FIELDS } from './model.js';
 import { I } from './icons.js';
 
 /*
@@ -284,6 +285,10 @@ function playerEl(team, number, pt, extra = {}) {
 export function dropPlayer(team, number, cx, cy) {
   if (!isOverStage(cx, cy)) return false;
   const pt = toW(inv(), cx, cy);
+  if (isNet(page())) {
+    commit((p) => p.elements.push(makeSil({ x: pt.x, team, color: board().teams[team].color })));
+    return true;
+  }
   commit((p) => {
     p.elements.push(playerEl(team, number, pt));
     assignMissingRoles(team, p); // Rolle der nächstgelegenen Position → Rotation/Läufer möglich
@@ -291,6 +296,13 @@ export function dropPlayer(team, number, cx, cy) {
   return true;
 }
 export function addPlayerDefault(team, number) {
+  if (isNet(page())) {
+    // Netzansicht: Silhouette, nebeneinander verteilt
+    const W = (FIELDS[board().fieldType] || FIELDS.indiaca).width;
+    const n = page().elements.filter((e) => e.type === 'sil').length;
+    commit((p) => p.elements.push(makeSil({ x: ((n % 5) + 1) * (W / 6), team, color: board().teams[team].color })));
+    return;
+  }
   // nächste freie Grundposition 1–5 für dieses Team
   if (number == null) number = (page().elements.filter((e) => e.type === 'player' && e.team === team).length % 5) + 1;
   const pt = posToModel(number, sideOf(board(), team), board().fieldType);
@@ -450,6 +462,7 @@ function move(e) {
       const el = findEl(g.id);
       if (!el) return;
       translate(el, g.orig, pt.x - g.start.x, pt.y - g.start.y);
+      if (isNet(page()) && el.type === 'sil') showReadout(e, el.x, 0);
       if (isNet(page()) && el.type === 'marker') {
         snapToNet(page(), el);
         showReadout(e, el.x, el.y);
@@ -636,6 +649,9 @@ function translate(el, o, dx, dy) {
     case 'marker':
       el.x = r3(o.x + dx);
       el.y = r3(o.y + dy);
+      break;
+    case 'sil': // nur seitlich verschiebbar (Sprunghöhe über den Regler)
+      el.x = Math.round((o.x + dx) * 100) / 100;
       break;
     case 'zone':
       if (o.points) el.points = o.points.map((q) => [r3(q[0] + dx), r3(q[1] + dy)]);

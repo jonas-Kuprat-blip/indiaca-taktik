@@ -1,7 +1,7 @@
 import { FIELDS } from './model.js';
 import { strokePath } from './stroke.js';
 import { esc, colorCss } from './util.js';
-import { isNet, netBox, netViewBox, renderNetField } from './net.js';
+import { isNet, netBox, netViewBox, renderNetField, silMarkup, reachOf } from './net.js';
 
 const f = (n) => Math.round(n * 1000) / 1000;
 /** Zusätzlicher Größenfaktor für Spieler/Marker (Handy-Layout: etwas größer) */
@@ -143,6 +143,8 @@ export function renderOne(el, page, b, rot = 0) {
       return `<g class="el ar" data-id="${el.id}"><path class="hit" d="M${f(el.x1)} ${f(el.y1)}L${f(el.x2)} ${f(el.y2)}" style="stroke-width:${0.6 * s}"/>${arrowMarkup(
         el.x1, el.y1, el.x2, el.y2, el.color, el.width, el.dashed
       )}</g>`;
+    case 'sil':
+      return silMarkup(el);
     case 'link': {
       // Linie zwischen zwei Markern (folgt den Markern, auch in Animationen)
       const a = page?.elements.find((e) => e.id === el.a), z = page?.elements.find((e) => e.id === el.b);
@@ -172,7 +174,7 @@ export function renderOne(el, page, b, rot = 0) {
   return '';
 }
 
-const ORDER = { zone: 0, stroke: 1, arrow: 2, link: 2.5, marker: 3, player: 4 };
+const ORDER = { sil: -1, zone: 0, stroke: 1, arrow: 2, link: 2.5, marker: 3, player: 4 };
 export function renderElements(page, b, rot = 0) {
   if (!page) return '';
   const els = [...page.elements].sort((a, c) => (ORDER[a.type] ?? 9) - (ORDER[c.type] ?? 9));
@@ -191,6 +193,10 @@ export function renderSelection(el, page, b) {
       return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.45 * s * (el.size || 1) + pad)}"/>`;
     case 'marker':
       return `<circle class="sel" cx="${f(el.x)}" cy="${f(el.y)}" r="${f(0.4 * s * (el.size || 1))}"/>` + (el.from ? handle('from', el.from.x, el.from.y, s) : '');
+    case 'sil': {
+      const H = el.groesse || 1.8, r = reachOf(el);
+      return `<rect class="sel" x="${f(el.x - 0.27 * H)}" y="${f(-r - 0.12)}" width="${f(0.54 * H)}" height="${f(r + 0.15)}"/>`;
+    }
     case 'link': {
       const a = page?.elements.find((e) => e.id === el.a), z = page?.elements.find((e) => e.id === el.b);
       return a && z ? `<line class="sel" x1="${f(a.x)}" y1="${f(a.y)}" x2="${f(z.x)}" y2="${f(z.y)}"/>` : '';

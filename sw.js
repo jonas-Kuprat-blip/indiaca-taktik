@@ -1,6 +1,6 @@
 // Service Worker: macht die App komplett offline-fähig.
 // Bei jeder Änderung an Dateien VERSION hochzählen, damit alte Caches gelöscht werden.
-const VERSION = 'taktik-v41';
+const VERSION = 'taktik-v42';
 const ASSETS = [
   './',
   './index.html',
@@ -60,7 +60,7 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Stale-while-revalidate: sofort aus dem Cache antworten, im Hintergrund aktualisieren.
+// Online: zuerst aus dem Netz (mit kurzer Zeitgrenze) → immer die aktuelle Version; offline: aus dem Cache.
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
@@ -68,13 +68,19 @@ self.addEventListener('fetch', (e) => {
     caches.open(VERSION).then(async (cache) => {
       const key = req.mode === 'navigate' ? './index.html' : req;
       const cached = await cache.match(key, { ignoreSearch: true });
-      const network = fetch(req.mode === 'navigate' ? req : new Request(req, { cache: 'no-cache' }))
-        .then((res) => {
-          if (res.ok) cache.put(key, res.clone());
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
+      const network = fetch(req.mode === 'navigate' ? req : new Request(req, { cache: 'no-cache' })).then((res) => {
+        if (res.ok) cache.put(key, res.clone());
+        return res;
+      });
+      if (!cached) return network;
+      // schlechtes Netz: nach 2,5 s die gespeicherte Version nehmen (Netz aktualisiert den Cache trotzdem)
+      const timeout = new Promise((r) => setTimeout(() => r(cached), 2500));
+      return Promise.race([network.catch(() => cached), timeout]);
     })
   );
+});
+
+// Version für die Anzeige in den Einstellungen
+self.addEventListener('message', (e) => {
+  if (e.data === 'version') e.source?.postMessage({ version: VERSION });
 });

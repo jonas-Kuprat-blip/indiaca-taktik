@@ -29,7 +29,7 @@ export function openSettings() {
     rotToggle.classList.toggle('on', state.animRotation !== false);
     rotToggle.setAttribute('aria-checked', String(state.animRotation !== false));
   };
-  modal({
+  const sm = modal({
     title: 'Einstellungen',
     body: h('div', { class: 'form' },
       h('div', { class: 'set-row' },
@@ -61,6 +61,24 @@ export function openSettings() {
         h('button', { class: 'btn text', onclick: openPositions }, 'Öffnen'))),
     actions: [{ label: 'Fertig', primary: true }],
   });
+  showVersion(sm.box);
+}
+
+/** Installierte Version (aus dem Service Worker) unten in den Einstellungen anzeigen */
+function showVersion(modalBox) {
+  const box = modalBox?.querySelector('.modal-body');
+  if (!box) return;
+  const el = h('p', { class: 'muted small app-version' }, 'Version wird geprüft …');
+  box.append(el);
+  const sw = navigator.serviceWorker;
+  if (!sw?.controller) return (el.textContent = 'Version: ohne Offline-Speicher (Browser-Vorschau)');
+  const onMsg = (e) => {
+    if (!e.data?.version) return;
+    el.textContent = `Version ${e.data.version.replace('taktik-', '')} · Updates kommen automatisch beim Öffnen der App`;
+    sw.removeEventListener('message', onMsg);
+  };
+  sw.addEventListener('message', onMsg);
+  sw.controller.postMessage('version');
 }
 
 /**

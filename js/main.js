@@ -58,7 +58,23 @@ async function start() {
   navigator.storage?.persist?.();
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW-Registrierung fehlgeschlagen', err));
+    // Updates: beim Start, beim Zurückkehren in die App und stündlich nach einer neuen Version fragen.
+    // Ist eine neue Version aktiv, einmal neu laden (vorher speichern) – kein mehrfaches Schließen mehr nötig.
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloading) return;
+      reloading = true;
+      store.flushNow();
+      setTimeout(() => location.reload(), 150);
+    });
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
+      const check = () => reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
+      addEventListener('focus', check);
+      setInterval(check, 60 * 60 * 1000);
+      check();
+    }).catch((err) => console.warn('SW-Registrierung fehlgeschlagen', err));
   }
 }
 

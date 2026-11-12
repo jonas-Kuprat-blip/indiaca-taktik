@@ -5,7 +5,7 @@ import {
 } from './store.js';
 import { clampPlayer } from './model.js';
 import { posToModel, sideOf, roleOfPos, roleAtPos } from './library.js';
-import { teamRot } from './rotation.js';
+import { teamRot, assignMissingRoles } from './rotation.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox, ui as renderUi } from './render.js';
 import { strokePath } from './stroke.js';
 import { I } from './icons.js';
@@ -266,7 +266,10 @@ function playerEl(team, number, pt, extra = {}) {
 export function dropPlayer(team, number, cx, cy) {
   if (!isOverStage(cx, cy)) return false;
   const pt = toW(inv(), cx, cy);
-  commit((p) => p.elements.push(playerEl(team, number, pt)));
+  commit((p) => {
+    p.elements.push(playerEl(team, number, pt));
+    assignMissingRoles(team, p); // Rolle der nächstgelegenen Position → Rotation/Läufer möglich
+  });
   return true;
 }
 export function addPlayerDefault(team, number) {

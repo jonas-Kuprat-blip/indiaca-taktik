@@ -2,7 +2,7 @@ import { h } from '../util.js';
 import { on, board, page } from '../store.js';
 import { FIELDS } from '../model.js';
 import { roleName, POS_NUMS, posOfRole } from '../library.js';
-import { teamRot, teamLaeufer, rotateTeam, setLaeufer, roleFigures } from '../rotation.js';
+import { teamRot, teamLaeufer, rotateTeam, setLaeufer, teamPlayers } from '../rotation.js';
 import { boardSquads } from '../kader.js';
 import { place, toast } from './dialogs.js';
 
@@ -39,8 +39,9 @@ export function initRotBar(wrap) {
     const back = h('div', { class: 'pop-back' });
     const close = () => back.remove();
     const cur = teamLaeufer(team);
+    const r0 = teamRot(team) ?? 0;
     const pop = h('div', { class: 'pop rb-pop' },
-      h('div', { class: 'rb-ph' }, h('b', {}, teamName(team)), h('span', { class: 'muted small' }, `aktuell Läufer ${cur}`)),
+      h('div', { class: 'rb-ph' }, h('b', {}, teamName(team)), h('span', { class: 'muted small' }, cur ? `aktuell Läufer ${cur}` : 'noch ohne Rollen')),
       h('div', { class: 'rb-sec' }, 'Läufer (1. Zuspieler auf Position …)'),
       h('div', { class: 'rb-grid' }, POS_NUMS.map((L) =>
         h('button', { class: 'rb-opt' + (L === cur ? ' active' : ''), onclick: () => { close(); if (L !== cur) setLaeufer(team, L); } }, 'L' + L))),
@@ -48,7 +49,7 @@ export function initRotBar(wrap) {
       h('div', { class: 'rb-grid' }, [1, 2, 3, 4].map((n) => h('button', { class: 'rb-opt', onclick: () => { close(); turn(team, n); } }, `↺ ${n}`))),
       h('div', { class: 'rb-sec' }, 'Vor drehen um'),
       h('div', { class: 'rb-grid' }, [1, 2, 3, 4].map((n) => h('button', { class: 'rb-opt', onclick: () => { close(); turn(team, -n); } }, `↻ ${n}`))),
-      h('div', { class: 'rb-roles muted small' }, POS_NUMS.map((rl) => h('div', {}, `${roleName(rl)} → Pos. ${posOfRole(rl, teamRot(team))}`))));
+      h('div', { class: 'rb-roles muted small' }, (cur ? POS_NUMS.map((rl) => h('div', {}, `${roleName(rl)} → Pos. ${posOfRole(rl, r0)}`)) : [h('div', {}, 'Die Figuren bekommen beim ersten Drehen die Rolle ihrer nächstgelegenen Position (wie Läufer 2).')])));
     back.addEventListener('pointerdown', (e) => e.target === back && close());
     back.append(pop);
     document.body.append(back);
@@ -65,7 +66,7 @@ export function initRotBar(wrap) {
     let any = false;
     for (const team of ['own', 'opp']) {
       const bar = bars[team];
-      const has = roleFigures(team, pg).some((e) => e.pos);
+      const has = teamPlayers(team, pg).length > 0;
       const L = has ? teamLaeufer(team) : null;
       const F = FIELDS[b.fieldType];
       const left = (b.ownSide === 'right') === (team === 'opp');
@@ -86,7 +87,7 @@ export function initRotBar(wrap) {
       }
       bar.el.classList.toggle('show', vis);
       any ||= vis;
-      if (vis) bar.lbtn.replaceChildren(h('b', {}, 'L' + L), h('span', {}, 'Läufer'));
+      if (vis) bar.lbtn.replaceChildren(h('b', {}, L ? 'L' + L : 'L?'), h('span', {}, 'Läufer'));
       const nm = teamName(team);
       bar.back.setAttribute('aria-label', `${nm} zurück drehen`);
       bar.fwd.setAttribute('aria-label', `${nm} vor drehen`);

@@ -623,7 +623,9 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 #stage-wrap.anim #net3d { height: calc(100% - 120px); }
 #net3d-hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 4; display: none; pointer-events: none; font-size: 13px; color: var(--muted); background: var(--panel); padding: 6px 12px; border-radius: 99px; border: 1px solid var(--border); white-space: nowrap; }
 #stage-wrap.net3d:not(.anim) #net3d-hint { display: block; }
-#stage-wrap.net3d #hint, #stage-wrap.net3d #selbar, #stage-wrap.net3d #net-readout { display: none !important; }
+#stage-wrap.net3d #hint { display: none !important; }
+#net3d [data-id] { cursor: grab; }
+#stage-wrap.net3d #net-readout { z-index: 8; }
 .nv3-mesh { fill: rgba(15, 23, 42, .22); }
 .nv3-side { opacity: .75; }
 .nv3-ml { stroke: rgba(15, 23, 42, .35); stroke-width: 0.0015; }

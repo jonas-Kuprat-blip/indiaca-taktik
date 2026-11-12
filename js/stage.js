@@ -9,7 +9,7 @@ import { teamRot, assignMissingRoles } from './rotation.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox, ui as renderUi } from './render.js';
 import { strokePath } from './stroke.js';
 import { isNet, netH, netCfg, snapToNet, readoutText, makeSil } from './net.js';
-import { render3d, VIEWBOX_3D } from './net3d.js';
+import { render3d, VIEWBOX_3D, unproject3d, silZ } from './net3d.js';
 import { FIELDS } from './model.js';
 import { I } from './icons.js';
 
@@ -143,7 +143,7 @@ export function initStage(wrap) {
   v3.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   const v3hint = document.createElement('div');
   v3hint.id = 'net3d-hint';
-  v3hint.textContent = '3D: wischen = schwenken · 2 Finger = zoomen · Doppeltipp = zurück · Bearbeiten in 2D';
+  v3hint.textContent = '3D: Figuren und Marker ziehen · leere Fläche wischen = schwenken · 2 Finger = zoomen · Doppeltipp = zurück';
   wrap.append(v3, v3hint);
   // 1 Finger: Kamera schwenken · 2 Finger: Zoom + Verschieben · Mausrad: Zoom · Doppeltipp: zurücksetzen
   const ptrs3 = new Map();
@@ -155,6 +155,16 @@ export function initStage(wrap) {
   v3.addEventListener('pointerdown', (e) => {
     try { v3.setPointerCapture(e.pointerId); } catch {}
     ptrs3.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    // Figur/Marker antippen oder ziehen (wie in 2D) – sonst schwenken
+    const node = ptrs3.size === 1 && !editLock() ? e.target.closest?.('[data-id]') : null;
+    const el = node && findEl(node.dataset.id);
+    if (el && (el.type === 'marker' || el.type === 'sil')) {
+      const z0 = el.type === 'sil' ? silZ(el) : 0;
+      const q = vb3(e.clientX, e.clientY);
+      const w = unproject3d(board(), yaw3, dolly3(), q.x, q.y, z0);
+      g3 = { kind: 'drag', id: el.id, z0, w0: w, orig: { x: el.x, y: el.y }, cx: e.clientX, cy: e.clientY, moved: false };
+      return;
+    }
     if (ptrs3.size === 1) g3 = { kind: 'yaw', x: e.clientX, yaw: yaw3 };
     else if (ptrs3.size === 2) {
       const [a, b] = [...ptrs3.values()];
@@ -164,6 +174,25 @@ export function initStage(wrap) {
   v3.addEventListener('pointermove', (e) => {
     if (!ptrs3.has(e.pointerId) || !g3) return;
     ptrs3.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (g3.kind === 'drag') {
+      if (!g3.moved && Math.hypot(e.clientX - g3.cx, e.clientY - g3.cy) < 5) return;
+      if (!g3.moved) {
+        g3.moved = true;
+        snapshot(); // ein Undo-Schritt pro Verschieben
+      }
+      const el = findEl(g3.id);
+      const q = vb3(e.clientX, e.clientY);
+      const w = unproject3d(board(), yaw3, dolly3(), q.x, q.y, g3.z0);
+      if (!el || !w || !g3.w0) return;
+      el.x = Math.round((g3.orig.x + w.X - g3.w0.X) * 100) / 100;
+      if (el.type === 'marker') {
+        el.y = Math.min(0, Math.round((g3.orig.y - (w.Y - g3.w0.Y)) * 100) / 100);
+        snapToNet(page(), el);
+        showReadout(e, el.x, el.y);
+      } else showReadout(e, el.x, 0);
+      changed();
+      return;
+    }
     if (g3.kind === 'yaw' && ptrs3.size === 1) {
       if (state.viewLocked) return;
       yaw3 = Math.max(-0.45, Math.min(0.45, g3.yaw - (e.clientX - g3.x) / 500));
@@ -185,6 +214,12 @@ export function initStage(wrap) {
   });
   const end3 = (e) => {
     ptrs3.delete(e.pointerId);
+    if (g3?.kind === 'drag') {
+      hideReadout();
+      if (!g3.moved) select(g3.id); // Antippen = auswählen (Leiste mit Größe, Sprung, Beschriftung …)
+      g3 = null;
+      return;
+    }
     if (ptrs3.size === 1) {
       const [p] = [...ptrs3.values()];
       g3 = { kind: 'yaw', x: p.x, yaw: yaw3 };

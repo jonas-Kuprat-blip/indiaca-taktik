@@ -13,14 +13,37 @@ const EYE = 1.7, NEAR = 0.25, FOCAL = 1;
 export const VIEWBOX_3D = '-1.25 -0.82 2.5 1.6';
 const f = (n) => Math.round(n * 10000) / 10000;
 
-/** dolly ≥ 0: Kamera fährt so viele Meter zurück (und etwas nach oben) – zum Herauszoomen */
-export function render3d(pg, b, yaw = 0, dolly = 0) {
+/** Tiefe der Silhouetten: eigene knapp vor dem Netz, Gegner dahinter */
+export const SIL_Z = { own: -0.6, opp: 0.9 };
+export const silZ = (e) => (e.team === 'opp' ? SIL_Z.opp : SIL_Z.own);
+
+/** Kamera: dolly ≥ 0 = so viele Meter zurück (und etwas nach oben, leicht nach unten geneigt) – zum Herauszoomen */
+function camera(b, yaw, dolly) {
   const F = FIELDS[b.fieldType] || FIELDS.indiaca;
+  const A = F.attack;
+  const pitch = Math.atan2(dolly * 0.45, A + dolly) * 0.9;
+  return {
+    F, x: F.width / 2, y: EYE + dolly * 0.45, z: -A - dolly,
+    cp: Math.cos(pitch), sp: Math.sin(pitch), c: Math.cos(yaw), s: Math.sin(yaw),
+  };
+}
+
+/** Bildpunkt (viewBox-Koordinaten) → Punkt in der senkrechten Ebene Z = z0 (zum Verschieben in 3D) */
+export function unproject3d(b, yaw, dolly, sx, sy, z0) {
+  const { x, y, z, cp, sp, c, s } = camera(b, yaw, dolly);
+  const vx = sx / FOCAL, vy = -sy / FOCAL, vz = 1;
+  const dy = vy * cp - vz * sp, z1 = vy * sp + vz * cp;
+  const dx = vx * c + z1 * s, dz = -vx * s + z1 * c;
+  if (Math.abs(dz) < 1e-6) return null;
+  const t = (z0 - z) / dz;
+  if (t <= 0) return null;
+  return { X: x + dx * t, Y: y + dy * t };
+}
+
+export function render3d(pg, b, yaw = 0, dolly = 0) {
+  const { F, x: camX, y: camY, z: camZ, cp, sp, c, s } = camera(b, yaw, dolly);
   const W = F.width, L2 = F.length / 2, A = F.attack, H = netCfg(pg).hoehe;
-  const cam = { x: W / 2, y: EYE + dolly * 0.45, z: -A - dolly };
-  const pitch = Math.atan2(dolly * 0.45, A + dolly) * 0.9; // beim Zurückfahren leicht nach unten schauen
-  const cp = Math.cos(pitch), sp = Math.sin(pitch);
-  const c = Math.cos(yaw), s = Math.sin(yaw);
+  const cam = { x: camX, y: camY, z: camZ };
   const view = ([X, Y, Z]) => {
     const dx = X - cam.x, dz = Z - cam.z, dy = Y - cam.y;
     const x1 = dx * c - dz * s, z1 = dx * s + dz * c;
@@ -75,7 +98,7 @@ export function render3d(pg, b, yaw = 0, dolly = 0) {
     if (!g) return '';
     return `<g transform="translate(${f(g.p[0] - el.x * g.k)} ${f(g.p[1])}) scale(${f(g.k)})">${silMarkup(el)}</g>`;
   };
-  s3 += sils.filter((e) => e.team === 'opp').map((e) => silAt(e, 0.9)).join('');
+  s3 += sils.filter((e) => e.team === 'opp').map((e) => silAt(e, SIL_Z.opp)).join('');
 
   // Netz: Maschen, Band, Pfosten, Antennen
   s3 += poly([[-0.5, H - NET_BAND, 0], [W + 0.5, H - NET_BAND, 0], [W + 0.5, H, 0], [-0.5, H, 0]], 'class="nv3-mesh"');
@@ -98,6 +121,7 @@ export function render3d(pg, b, yaw = 0, dolly = 0) {
     if (!m) continue;
     const r = Math.max(0.012, 0.14 * m.k * (e.size || 1)), col = colorCss(e.color);
     const [x, y] = m.p;
+    s3 += `<g class="el mk3" data-id="${esc(e.id)}"><circle class="hit-a" cx="${f(x)}" cy="${f(y)}" r="${f(Math.max(0.035, r * 1.8))}"/>`;
     // Fußpunkt-Lot zum Boden als Höhenhilfe
     const g = pt(e.x, 0, 0);
     if (g) s3 += `<line x1="${f(x)}" y1="${f(y)}" x2="${f(g.p[0])}" y2="${f(g.p[1])}" style="stroke:${col};stroke-width:0.003;stroke-dasharray:0.01 0.01;opacity:.7"/>`;
@@ -106,10 +130,10 @@ export function render3d(pg, b, yaw = 0, dolly = 0) {
     else if (e.symbol === 'dot') s3 += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" style="fill:${col}"/>`;
     else s3 += `<path d="M${f(x - r)} ${f(y - r)}L${f(x + r)} ${f(y + r)}M${f(x - r)} ${f(y + r)}L${f(x + r)} ${f(y - r)}" style="stroke:${col};stroke-width:${f(r * 0.45)};stroke-linecap:round"/>`;
     const t = `${e.label ? esc(e.label) + ' · ' : ''}${fmtM(-e.y)}`;
-    s3 += `<text class="nv3-lbl" x="${f(x + r * 1.4)}" y="${f(y - r * 1.2)}">${t}</text>`;
+    s3 += `<text class="nv3-lbl" x="${f(x + r * 1.4)}" y="${f(y - r * 1.2)}">${t}</text></g>`;
   }
   // eigene Spieler stehen nah vor der Kamera → halbtransparent, damit Marker sichtbar bleiben
-  s3 += `<g style="opacity:.6">${sils.filter((e) => e.team !== 'opp').map((e) => silAt(e, -0.6)).join('')}</g>`;
+  s3 += `<g style="opacity:.6">${sils.filter((e) => e.team !== 'opp').map((e) => silAt(e, SIL_Z.own)).join('')}</g>`;
   return s3;
 }
 

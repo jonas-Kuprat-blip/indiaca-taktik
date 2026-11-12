@@ -7,7 +7,7 @@ import { state } from './store.js';
  * Seitentyp „Netzansicht“: frontale Sicht eines Spielers aufs Netz (2D, maßstabsgetreu).
  * Koordinaten: x = Meter ab linker Seitenlinie (0 … Feldbreite), y = −Höhe in Metern (Boden = 0, nach oben negativ).
  *   page.kind = 'netz' (oder Animationsseite mit page.net)
- *   page.net  = { preset, hoehe, hilfslinien, einrasten, legende: { farbe: Bedeutung } }
+ *   page.net  = { preset, hoehe, hilfslinien, einrasten, view: '2d'|'3d' }
  * Netzhöhen nach CVJM-/IIA-Regeln (in den Einstellungen änderbar): lib.netHeights
  */
 export const NET_PRESETS = [['herren', 'Herren'], ['damen', 'Damen'], ['mixed', 'Mixed'], ['jugend', 'Jugend'], ['manuell', 'Manuell']];
@@ -37,7 +37,7 @@ export const netH = (p) => netCfg(p).hoehe;
 export function netBox(ft, p) {
   const W = (FIELDS[ft] || FIELDS.indiaca).width;
   const top = Math.max(3.9, netH(p) + ANTENNA + 0.6);
-  return { x0: -1.35, x1: W + 1.1, y0: -top, y1: 0.75 };
+  return { x0: -0.85, x1: W + 0.85, y0: -top, y1: 0.75 };
 }
 export function netViewBox(ft, p) {
   const b = netBox(ft, p);
@@ -81,16 +81,6 @@ export function renderNetField(b, p) {
       s += `<line class="nv-ant ${i % 2 ? 'w' : 'r'}" x1="${ax}" x2="${ax}" y1="${f(y)}" y2="${f(Math.max(yt, y - 0.1))}"/>`;
   }
   s += `<text class="nv-lbl" x="0.12" y="${f(-H + 0.2)}">Netz ${fmtM(H)}</text>`;
-  // Höhenskala links: 10-cm-Striche, alle 50 cm beschriftet
-  const sx = -0.62;
-  s += `<line class="nv-scale" x1="${sx}" x2="${sx}" y1="0" y2="${f(y0 + 0.15)}"/>`;
-  for (let i = 0; i <= Math.floor((-y0 - 0.15) * 10); i++) {
-    const y = -i / 10, big = i % 5 === 0;
-    s += `<line class="nv-tick${big ? ' big' : ''}" x1="${sx}" x2="${f(sx - (big ? 0.2 : i % 5 ? 0.09 : 0.14))}" y1="${f(y)}" y2="${f(y)}"/>`;
-    if (big) s += `<text class="nv-num" x="${f(sx - 0.25)}" y="${f(y)}" text-anchor="end" dominant-baseline="central">${(i / 10).toFixed(1).replace('.', ',')}</text>`;
-  }
-  // Netzoberkante auf der Skala markieren
-  s += `<path class="nv-mark" d="M${sx + 0.02} ${f(-H)}l0.16 -0.08v0.16Z"/>`;
   // Seitliche Skala am Boden (Meter ab links)
   for (let m = 0; m <= Math.floor(W); m++) s += `<line class="nv-tick" x1="${m}" x2="${m}" y1="0.02" y2="0.14"/><text class="nv-num" x="${m}" y="0.3" text-anchor="middle" dominant-baseline="central">${m}</text>`;
   s += `<text class="nv-num" x="${f(W + 0.15)}" y="0.3" dominant-baseline="central">m</text>`;

@@ -20,10 +20,10 @@ const teamName = (team) => {
 
 export function initRotBar(wrap) {
   const bars = {};
-  // Gesammelt direkt über dem Schloss (linke Leiste mit Schloss/Zoom): oben Gegner, unten eigenes Team
+  // Direkt über dem Schloss, hochkant wie die Feld-Leiste: je Team eine Spalte (links eigenes Team, rechts Gegner)
   const dock = h('div', { id: 'rotdock' });
   wrap.append(dock);
-  for (const team of ['opp', 'own']) {
+  for (const team of ['own', 'opp']) {
     const back = h('button', { class: 'btn rb-btn', html: ARROW_BACK, 'aria-label': `${teamName(team)} zurück drehen`, title: 'Zurück drehen (Pos. 1 → 2 → 3 …)', onclick: () => turn(team, 1) });
     const lbtn = h('button', { class: 'btn rb-l', 'aria-label': `${teamName(team)} Läufer und Rotation`, title: 'Läufer / um mehrere Positionen drehen', onclick: () => openPop(team, lbtn) });
     const fwd = h('button', { class: 'btn rb-btn', html: ARROW_FWD, 'aria-label': `${teamName(team)} vor drehen`, title: 'Vor drehen (Pos. 2 → 1 …)', onclick: () => turn(team, -1) });
@@ -71,7 +71,7 @@ export function initRotBar(wrap) {
       any ||= vis;
       const nm = teamName(team);
       const short = boardSquads()[team]?.name || (team === 'own' ? 'Wir' : 'Gegner');
-      if (vis) bar.lbtn.replaceChildren(h('b', {}, L ? 'L' + L : 'L?'), h('span', {}, short.length > 9 ? short.slice(0, 8) + '…' : short));
+      if (vis) bar.lbtn.replaceChildren(h('b', {}, L ? 'L' + L : 'L?'), h('span', {}, short.length > 7 ? short.slice(0, 6) + '…' : short));
       bar.lbtn.title = `${nm}: Läufer / um mehrere Positionen drehen`;
       bar.back.setAttribute('aria-label', `${nm} zurück drehen`);
       bar.fwd.setAttribute('aria-label', `${nm} vor drehen`);

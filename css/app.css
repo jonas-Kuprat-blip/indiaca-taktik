@@ -535,15 +535,15 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 .hofs-say { min-height: 90px; resize: vertical; font-family: inherit; -webkit-user-select: text; user-select: text; }
 
 /* ---------- Rotation / Läufer: über dem Schloss (linke Leiste) ---------- */
-#rotdock { position: absolute; z-index: 4; display: none; flex-direction: column; gap: 6px; }
+#rotdock { position: absolute; z-index: 4; display: none; flex-direction: row; align-items: flex-end; gap: 6px; }
 #rotdock.show { display: flex; }
-.rotbar { display: none; align-items: center; gap: 2px;
-  background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--team, var(--accent)); border-radius: 14px; padding: 3px; box-shadow: var(--shadow); }
+.rotbar { display: none; flex-direction: column; align-items: center; gap: 4px; width: 54px;
+  background: var(--panel); border: 1px solid var(--border); border-top: 4px solid var(--team, var(--accent)); border-radius: 14px; padding: 4px; box-shadow: var(--shadow); }
 .rotbar.show { display: flex; }
 .rb-btn { width: 44px; height: 44px; }
-.rb-l { flex-direction: column; gap: 0; min-width: 62px; max-width: 74px; height: 44px; padding: 0 4px; line-height: 1.05; background: var(--panel2); }
-.rb-l b { font-size: 17px; font-weight: 900; }
-.rb-l span { font-size: 9.5px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rb-l { flex-direction: column; gap: 0; width: 44px; min-width: 44px; height: 46px; padding: 0 2px; line-height: 1.05; background: var(--panel2); }
+.rb-l b { font-size: 16px; font-weight: 900; }
+.rb-l span { font-size: 8.5px; color: var(--muted); max-width: 42px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rb-pop { min-width: 260px; gap: 4px; padding: 10px; }
 .rb-ph { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .rb-sec { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-top: 6px; }
@@ -618,7 +618,7 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 .el.sil.opp .sil-lbl { opacity: .7; }
 #stage-wrap.anim.net #anim-note { top: 70px; }
 
-#net3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; display: none; background: var(--table); touch-action: none; cursor: grab; }
+#net3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; overflow: hidden; display: none; background: var(--table); touch-action: none; cursor: grab; }
 #net3d.show { display: block; }
 #stage-wrap.anim #net3d { height: calc(100% - 120px); }
 #net3d-hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 4; display: none; pointer-events: none; font-size: 13px; color: var(--muted); background: var(--panel); padding: 6px 12px; border-radius: 99px; border: 1px solid var(--border); white-space: nowrap; }
@@ -863,7 +863,7 @@ html.phone .hof-grid { grid-template-columns: 1fr; }
   html:not(.phone) #toolbar .sep { margin: 0 3px; }
   html:not(.phone) #toolbar .board-name { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; line-height: 44px; }
 }
-html.phone .rotbar { padding: 2px; border-radius: 12px; }
+html.phone .rotbar { padding: 2px; gap: 0; width: 50px; border-radius: 12px; }
 html.phone #rotdock { gap: 4px; }
 .lu-rot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
 .lu-l { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }

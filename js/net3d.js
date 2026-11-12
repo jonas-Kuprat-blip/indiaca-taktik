@@ -1,5 +1,6 @@
 import { FIELDS } from './model.js';
 import { colorCss, esc } from './util.js';
+import { symbolMarkup } from './render.js';
 import { netCfg, NET_BAND, ANTENNA, silMarkup, fmtM } from './net.js';
 
 /*
@@ -93,7 +94,8 @@ export function render3d(pg, b, yaw = 0) {
     // Fußpunkt-Lot zum Boden als Höhenhilfe
     const g = pt(e.x, 0, 0);
     if (g) s3 += `<line x1="${f(x)}" y1="${f(y)}" x2="${f(g.p[0])}" y2="${f(g.p[1])}" style="stroke:${col};stroke-width:0.003;stroke-dasharray:0.01 0.01;opacity:.7"/>`;
-    if (e.symbol === 'ring') s3 += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" style="fill:none;stroke:${col};stroke-width:${f(r * 0.4)}"/>`;
+    if (e.symbol === 'indiaca') s3 += `<g transform="translate(${f(x)} ${f(y)}) scale(${f(r * 2.2)})">${symbolMarkup('indiaca', e.color, 1)}</g>`;
+    else if (e.symbol === 'ring') s3 += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" style="fill:none;stroke:${col};stroke-width:${f(r * 0.4)}"/>`;
     else if (e.symbol === 'dot') s3 += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" style="fill:${col}"/>`;
     else s3 += `<path d="M${f(x - r)} ${f(y - r)}L${f(x + r)} ${f(y + r)}M${f(x - r)} ${f(y + r)}L${f(x + r)} ${f(y - r)}" style="stroke:${col};stroke-width:${f(r * 0.45)};stroke-linecap:round"/>`;
     const t = `${e.label ? esc(e.label) + ' · ' : ''}${fmtM(-e.y)}`;

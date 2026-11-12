@@ -26,6 +26,29 @@ import { I } from './icons.js';
 let gGhost;
 let svg, gCam, gWorld, gField, gEls, gLive, gSel, trash, zoombar, rotpanel, rotInput, rotLabel, rotBtn, readout, v3;
 let yaw3 = 0;
+// 3D-Ansicht: Zoom/Verschieben über die viewBox (Basis = VIEWBOX_3D)
+const VB3 = VIEWBOX_3D.split(' ').map(Number);
+const view3 = { z: 1, cx: VB3[0] + VB3[2] / 2, cy: VB3[1] + VB3[3] / 2 };
+function applyView3() {
+  const w = VB3[2] / view3.z, h = VB3[3] / view3.z;
+  v3?.setAttribute('viewBox', `${view3.cx - w / 2} ${view3.cy - h / 2} ${w} ${h}`);
+}
+function zoom3(factor, at = { x: view3.cx, y: view3.cy }) {
+  const z = Math.max(1, Math.min(5, view3.z * factor));
+  const k = view3.z / z;
+  view3.cx = at.x - (at.x - view3.cx) * k;
+  view3.cy = at.y - (at.y - view3.cy) * k;
+  view3.z = z;
+  if (z === 1) Object.assign(view3, { cx: VB3[0] + VB3[2] / 2, cy: VB3[1] + VB3[3] / 2 });
+  applyView3();
+}
+function reset3() {
+  yaw3 = 0;
+  Object.assign(view3, { z: 1, cx: VB3[0] + VB3[2] / 2, cy: VB3[1] + VB3[3] / 2 });
+  applyView3();
+  draw3d();
+}
+const is3d = () => v3?.classList.contains('show');
 let linkFrom = null; // Netzansicht: „Linie zu …“ – erster Marker
 export function startLink(id) {
   linkFrom = id;
@@ -115,19 +138,60 @@ export function initStage(wrap) {
   v3.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   const v3hint = document.createElement('div');
   v3hint.id = 'net3d-hint';
-  v3hint.textContent = '3D: wischen zum Schwenken · Doppeltipp = gerade · Bearbeiten in 2D';
+  v3hint.textContent = '3D: wischen = schwenken · 2 Finger = zoomen · Doppeltipp = zurück · Bearbeiten in 2D';
   wrap.append(v3, v3hint);
-  let drag3 = null;
-  v3.addEventListener('pointerdown', (e) => { drag3 = { x: e.clientX, yaw: yaw3 }; try { v3.setPointerCapture(e.pointerId); } catch {} });
-  v3.addEventListener('pointermove', (e) => {
-    if (!drag3) return;
-    yaw3 = Math.max(-0.45, Math.min(0.45, drag3.yaw - (e.clientX - drag3.x) / 500));
-    draw3d();
+  // 1 Finger: Kamera schwenken · 2 Finger: Zoom + Verschieben · Mausrad: Zoom · Doppeltipp: zurücksetzen
+  const ptrs3 = new Map();
+  let g3 = null;
+  const vb3 = (cx, cy) => {
+    const q = new DOMPoint(cx, cy).matrixTransform(v3.getScreenCTM().inverse());
+    return { x: q.x, y: q.y };
+  };
+  v3.addEventListener('pointerdown', (e) => {
+    try { v3.setPointerCapture(e.pointerId); } catch {}
+    ptrs3.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs3.size === 1) g3 = { kind: 'yaw', x: e.clientX, yaw: yaw3 };
+    else if (ptrs3.size === 2) {
+      const [a, b] = [...ptrs3.values()];
+      g3 = { kind: 'pinch', d: Math.hypot(a.x - b.x, a.y - b.y), m: vb3((a.x + b.x) / 2, (a.y + b.y) / 2), z: view3.z, cx: view3.cx, cy: view3.cy };
+    }
   });
-  const end3 = () => (drag3 = null);
+  v3.addEventListener('pointermove', (e) => {
+    if (!ptrs3.has(e.pointerId) || !g3) return;
+    ptrs3.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (g3.kind === 'yaw' && ptrs3.size === 1) {
+      if (state.viewLocked) return;
+      yaw3 = Math.max(-0.45, Math.min(0.45, g3.yaw - (e.clientX - g3.x) / 500));
+      draw3d();
+    } else if (g3.kind === 'pinch' && ptrs3.size >= 2) {
+      if (state.viewLocked) return;
+      const [a, b] = [...ptrs3.values()];
+      const z = Math.max(1, Math.min(5, (g3.z * Math.hypot(a.x - b.x, a.y - b.y)) / (g3.d || 1)));
+      // Punkt unter der Fingermitte bleibt fest; Verschieben folgt der Fingermitte
+      Object.assign(view3, { z, cx: g3.cx, cy: g3.cy });
+      applyView3();
+      const m = vb3((a.x + b.x) / 2, (a.y + b.y) / 2);
+      const k = g3.z / z;
+      view3.cx = g3.m.x - (g3.m.x - g3.cx) * k - (m.x - g3.m.x);
+      view3.cy = g3.m.y - (g3.m.y - g3.cy) * k - (m.y - g3.m.y);
+      applyView3();
+    }
+  });
+  const end3 = (e) => {
+    ptrs3.delete(e.pointerId);
+    if (ptrs3.size === 1) {
+      const [p] = [...ptrs3.values()];
+      g3 = { kind: 'yaw', x: p.x, yaw: yaw3 };
+    } else if (!ptrs3.size) g3 = null;
+  };
   v3.addEventListener('pointerup', end3);
   v3.addEventListener('pointercancel', end3);
-  v3.addEventListener('dblclick', () => { yaw3 = 0; draw3d(); });
+  v3.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (state.viewLocked) return;
+    zoom3(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)), vb3(e.clientX, e.clientY));
+  }, { passive: false });
+  v3.addEventListener('dblclick', () => reset3());
   trash = document.createElement('div');
   trash.id = 'trash';
   trash.setAttribute('aria-label', 'Zum Löschen hierher ziehen');
@@ -147,7 +211,7 @@ export function initStage(wrap) {
     rotpanel.classList.toggle('show');
     rotBtn.classList.toggle('active', rotpanel.classList.contains('show'));
   });
-  const resetBtn = zb('Ansicht zurücksetzen (gerade, 100 %)', I.reset, resetView);
+  const resetBtn = zb('Ansicht zurücksetzen (gerade, 100 %)', I.reset, () => (is3d() ? reset3() : resetView()));
   resetBtn.classList.add('reset-btn');
   const lockBtn = zb('Ansicht sperren', I.unlock, () => set({ viewLocked: !state.viewLocked }));
   lockBtn.classList.add('lock-btn');
@@ -167,8 +231,8 @@ export function initStage(wrap) {
     lockBtn,
     rotBtn,
     resetBtn,
-    zb('Vergrößern', I.plus, () => zoomAt(viewCenter(), 1.4)),
-    zb('Verkleinern', I.minus, () => zoomAt(viewCenter(), 1 / 1.4))
+    zb('Vergrößern', I.plus, () => (is3d() ? zoom3(1.4) : zoomAt(viewCenter(), 1.4))),
+    zb('Verkleinern', I.minus, () => (is3d() ? zoom3(1 / 1.4) : zoomAt(viewCenter(), 1 / 1.4)))
   );
   // Dreh-Regler
   rotpanel = document.createElement('div');

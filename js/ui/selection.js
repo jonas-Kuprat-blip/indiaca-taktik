@@ -114,9 +114,8 @@ export function initSelectionBar(wrap) {
       parts.push(
         h('button', { class: 'btn' + (el.symbol === 'dot' ? ' active' : ''), html: I.dot, 'aria-label': 'Punkt', onclick: () => commit(() => (findEl(el.id).symbol = 'dot')) }),
         h('button', { class: 'btn' + (el.symbol === 'x' ? ' active' : ''), html: I.x, 'aria-label': 'Kreuz', onclick: () => commit(() => (findEl(el.id).symbol = 'x')) }),
-        isNet(p)
-          ? h('button', { class: 'btn' + (el.symbol === 'ring' ? ' active' : ''), html: I.ring, 'aria-label': 'Kreis', onclick: () => commit(() => (findEl(el.id).symbol = 'ring')) })
-          : h('button', { class: 'btn' + (el.symbol === 'indiaca' ? ' active' : ''), html: I.indiaca, 'aria-label': 'Indiaca', onclick: () => commit(() => (findEl(el.id).symbol = 'indiaca')) }),
+        isNet(p) ? h('button', { class: 'btn' + (el.symbol === 'ring' ? ' active' : ''), html: I.ring, 'aria-label': 'Kreis', onclick: () => commit(() => (findEl(el.id).symbol = 'ring')) }) : null,
+        h('button', { class: 'btn' + (el.symbol === 'indiaca' ? ' active' : ''), html: I.indiaca, 'aria-label': 'Indiaca', onclick: () => commit(() => (findEl(el.id).symbol = 'indiaca')) }),
         lbl('Größe'), slider(el, 'size', '0.5', '2.5', '0.1', 'Größe', 1),
         textInput(el, 'label', 'Beschriftung', 10)
       );
@@ -156,7 +155,7 @@ export function initSelectionBar(wrap) {
         dup(el));
     }
     parts.push(del(el));
-    bar.replaceChildren(...parts);
+    bar.replaceChildren(...parts.filter(Boolean));
     bar.classList.add('show');
   };
 

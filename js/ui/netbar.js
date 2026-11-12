@@ -1,10 +1,9 @@
-import { h, colorCss } from '../util.js';
+import { h } from '../util.js';
 import { on, page, touch, emit } from '../store.js';
-import { isNet, netCfg, netHeights, NET_PRESETS, usedColors, legendLabel, fmtM } from '../net.js';
-import { promptText } from './dialogs.js';
+import { isNet, netCfg, netHeights, NET_PRESETS, fmtM } from '../net.js';
 
 /*
- * Leiste oben in der Netzansicht: Netzhöhe (Voreinstellung/manuell), Hilfslinien, Einrasten, Legende.
+ * Leiste oben in der Netzansicht: 2D/3D, Netzhöhe (Voreinstellung/manuell), Hilfslinien, Einrasten.
  */
 export function initNetBar(wrap) {
   const bar = h('div', { id: 'netbar' });
@@ -43,20 +42,9 @@ export function initNetBar(wrap) {
       : null;
     const tog = (key, label) =>
       h('button', { class: 'btn text nb-tog' + (cfg[key] ? ' on' : ''), 'aria-pressed': String(cfg[key]), onclick: () => { cfg[key] = !cfg[key]; save(); } }, label);
-    const cols = usedColors(p);
-    const legend = cols.length
-      ? h('div', { class: 'nb-legend', 'aria-label': 'Legende' }, cols.map((c) =>
-          h('button', {
-            class: 'lg-i', title: 'Bedeutung ändern',
-            onclick: async () => {
-              const v = await promptText('Bedeutung der Farbe', legendLabel(p, c), { placeholder: 'z. B. Angriff' });
-              if (v != null) { cfg.legende[c] = v; save(); }
-            },
-          }, h('i', { style: { background: colorCss(c) } }), legendLabel(p, c) || 'Bedeutung?')))
-      : null;
     const view = h('div', { class: 'seg nb-view', role: 'group', 'aria-label': 'Ansicht' },
       [['2d', '2D frontal'], ['3d', '3D Perspektive']].map(([k, l]) => h('button', { class: 'seg-btn' + (cfg.view === k ? ' active' : ''), onclick: () => { cfg.view = k; save(); } }, l)));
-    bar.replaceChildren(...[view, h('span', { class: 'nb-t' }, 'Netz'), sel, man, tog('hilfslinien', 'Hilfslinien'), tog('einrasten', 'Am Netz einrasten'), legend].filter(Boolean));
+    bar.replaceChildren(...[view, h('span', { class: 'nb-t' }, 'Netz'), sel, man, tog('hilfslinien', 'Hilfslinien'), tog('einrasten', 'Am Netz einrasten')].filter(Boolean));
   };
   on(['page', 'board', 'elements'], render);
   render();

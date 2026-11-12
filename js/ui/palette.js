@@ -5,7 +5,7 @@ import { playerIcon } from '../render.js';
 import { I } from '../icons.js';
 import { state, on, set, setTool, board, page } from '../store.js';
 import { dropPlayer, addPlayerDefault } from '../stage.js';
-import { isNet, DEFAULT_LEGEND, legendLabel } from '../net.js';
+import { isNet } from '../net.js';
 
 export function initPalette(root) {
   // --- Spieler ---
@@ -36,16 +36,9 @@ export function initPalette(root) {
     toolBtn('marker', I.x, 'Kreuz', () => set({ markerSymbol: 'x' })),
     toolBtn('marker', I.ring, 'Kreis', () => set({ markerSymbol: 'ring' })),
     toolBtn('marker', I.dot, 'Punkt', () => set({ markerSymbol: 'dot' })),
+    toolBtn('marker', I.indiaca, 'Indiaca', () => set({ markerSymbol: 'indiaca' })),
   ];
-  ['x', 'ring', 'dot'].forEach((sy, i) => (netBtns[i].dataset.symbol = sy));
-  const netColors = h('div', { class: 'net-cols' });
-  const renderNetColors = () => {
-    const p = page();
-    if (!p || !isNet(p)) return;
-    netColors.replaceChildren(...Object.keys(DEFAULT_LEGEND).map((c) =>
-      h('button', { class: 'net-col' + (state.color === c ? ' active' : ''), onclick: () => { set({ color: c }); if (state.tool !== 'marker') setTool('marker'); } },
-        h('i', { style: { background: c } }), h('span', {}, legendLabel(p, c) || c))));
-  };
+  ['x', 'ring', 'dot', 'indiaca'].forEach((sy, i) => (netBtns[i].dataset.symbol = sy));
 
   // --- Kader: Kartei-Spieler (je nach Board-Mannschaft) ---
   const kSearch = h('input', { class: 'input sm kader-search', type: 'search', placeholder: 'Suchen …', 'aria-label': 'Kader durchsuchen' });
@@ -78,7 +71,7 @@ export function initPalette(root) {
     h('div', { class: 'pal-sec', 'data-sec': 'spieler' }, h('div', { class: 'pal-h' }, 'Spieler'), h('div', { class: 'teams' }, teamCols.map((c) => c.col))),
     h('div', { class: 'pal-sec', 'data-sec': 'kader' }, h('div', { class: 'pal-h' }, 'Kader'), kSearch, kList, insertBtn),
     h('div', { class: 'pal-sec', 'data-sec': 'ziel' }, h('div', { class: 'pal-h' }, 'Ziel / Position'), h('div', { class: 'pal-grid' }, markerBtns)),
-    h('div', { class: 'pal-sec', 'data-sec': 'netz' }, h('div', { class: 'pal-h' }, 'Höhen-Marker'), h('div', { class: 'pal-grid' }, netBtns), netColors,
+    h('div', { class: 'pal-sec', 'data-sec': 'netz' }, h('div', { class: 'pal-h' }, 'Höhen-Marker'), h('div', { class: 'pal-grid' }, netBtns),
       h('div', { class: 'muted small net-tip' }, 'Tippen setzt, Ziehen zeigt Höhe live.')),
     h('div', { class: 'pal-sec', 'data-sec': 'zonen' }, h('div', { class: 'pal-h' }, 'Zonen'), h('div', { class: 'pal-grid' }, zoneBtns))
   );
@@ -86,14 +79,13 @@ export function initPalette(root) {
   const secs = (n) => root.querySelector(`.pal-sec[data-sec="${n}"]`) || document.querySelector(`.pal-sec[data-sec="${n}"]`);
   const syncKind = () => {
     const net = isNet(page());
-    const z = secs('ziel');
-    if (z) z.style.display = net ? 'none' : '';
+    // Netzansicht: keine Feld-Ziele und keine Zonen
+    for (const n of ['ziel', 'zonen']) { const z = secs(n); if (z) z.style.display = net ? 'none' : ''; }
     // Netzansicht: Spieler/Kader setzen Silhouetten
     for (const n of ['spieler', 'kader']) { const h2 = secs(n)?.querySelector('.pal-h'); if (h2) h2.textContent = net ? (n === 'spieler' ? 'Silhouetten' : 'Kader → Silhouette') : (n === 'spieler' ? 'Spieler' : 'Kader'); }
     insertBtn.style.display = net ? 'none' : '';
     const ne = secs('netz');
     if (ne) ne.style.display = net ? '' : 'none';
-    renderNetColors();
   };
   on(['page', 'board', 'ui'], syncKind);
   on(['board', 'page', 'elements', 'library', 'boardSquad'], renderKader);

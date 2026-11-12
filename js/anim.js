@@ -168,12 +168,17 @@ function at(a, t) {
 const startOf = (a, i) => (i <= 0 ? 0 : timeline(a).segs[i - 1].t0 + HOLD + a.steps[i].dur);
 
 /** Zwischenstand zweier Elemente (Position, Größe, Form, Deckkraft); Farbe/Symbol wechseln zur Hälfte */
-const NUM = ['x', 'y', 'r', 'opacity', 'x1', 'y1', 'x2', 'y2', 'width', 'sprung', 'groesse'];
+const NUM = ['x', 'y', 'r', 'opacity', 'x1', 'y1', 'x2', 'y2', 'width', 'sprung', 'groesse', 'd'];
 function lerpEl(A, B, u) {
   const o = { ...(u < 0.5 ? A : B) };
   const L = (p, q) => p + (q - p) * u;
   for (const k of NUM) if (typeof A[k] === 'number' && typeof B[k] === 'number') o[k] = L(A[k], B[k]);
   if (A.type === 'player' || A.type === 'marker') o.size = L(A.size || 1, B.size || 1);
+  // Netzansicht: Tiefe (fehlt sie in einem Schritt, gilt der Standard: Marker im Netz, Silhouetten knapp davor/dahinter)
+  if (A.type === 'marker' || A.type === 'sil') {
+    const dd = (e) => (typeof e.d === 'number' ? e.d : e.type === 'sil' ? (e.team === 'opp' ? 0.9 : -0.6) : 0);
+    if (typeof A.d === 'number' || typeof B.d === 'number') o.d = L(dd(A), dd(B));
+  }
   if (A.type === 'player') {
     // kürzester Drehweg
     const ra = A.rot || 0, d = ((((B.rot || 0) - ra + 180) % 360) + 360) % 360 - 180;
@@ -420,9 +425,11 @@ function netExample(name, steps) {
 const SIL = (id, x, sprung, extra) => ({ id, type: 'sil', y: 0, x, sprung, groesse: 1.85, team: 'own', color: '#2563eb', label: '', ...extra });
 const ZU = (x, sprung = 0) => SIL('n_zu', x, sprung, { label: '1. Zuspieler', short: 'Z', groesse: 1.8 });
 const BL = (id, x, sprung = 0) => SIL(id, x, sprung, { team: 'opp', color: '#dc2626', label: 'Block', short: 'B' });
-const BALL = (x, h) => ({ id: 'n_ball', type: 'marker', symbol: 'indiaca', color: '#dc2626', label: '', size: 1, x, y: -h });
-const TP = (x, h) => ({ id: 'n_tp', type: 'marker', symbol: 'x', color: '#ef4444', label: 'Treffpunkt', size: 1, x, y: -h });
-const UEB = (x, h) => ({ id: 'n_ueb', type: 'marker', symbol: 'ring', color: '#3b82f6', label: 'über die Netzkante', size: 1, x, y: -h });
+const BALL = (x, h, d = 0) => ({ id: 'n_ball', type: 'marker', symbol: 'indiaca', color: '#dc2626', label: '', size: 1, x, y: -h, d });
+const TP = (x, h, d = -0.3) => ({ id: 'n_tp', type: 'marker', symbol: 'x', color: '#ef4444', label: 'Treffpunkt', size: 1, x, y: -h, d });
+const UEB = (x, h) => ({ id: 'n_ueb', type: 'marker', symbol: 'ring', color: '#3b82f6', label: 'über die Netzkante', size: 1, x, y: -h, d: 0 });
+const LAND = (x, d) => ({ id: 'n_land', type: 'marker', symbol: 'dot', color: '#f59e0b', label: 'Aufprall', size: 1, x, y: -0.05, d });
+const FLUG2 = { id: 'n_flug2', type: 'link', a: 'n_ueb', b: 'n_land', color: '#ef4444', dashed: true };
 const FLUG = { id: 'n_flug', type: 'link', a: 'n_tp', b: 'n_ueb', color: '#ef4444', dashed: true };
 
 function netExamples() {
@@ -430,16 +437,18 @@ function netExamples() {
   const HA = (x, sprung = 0) => SIL('n_ha', x, sprung, { label: 'Hauptangreifer', short: 'HA', groesse: 1.9 });
   return [
     netExample('3D: Außenangriff', [
-      { note: '1. Zuspieler nimmt die Indiaca – Außenangreifer startet links', els: [ZU(4.7), AA(1.5), BL('n_b1', 3.8), BL('n_b2', 2.7), BALL(4.6, 2.3)] },
-      { note: 'Hohes Zuspiel nach außen – der Block verschiebt mit', dur: 1.2, els: [ZU(4.7, 0.15), AA(1.15), BL('n_b1', 2.5), BL('n_b2', 1.7), BALL(2.8, 3.6)] },
-      { note: 'Absprung – Treffpunkt hoch über der Netzkante', els: [ZU(4.6), AA(1.0, 0.6), BL('n_b1', 2.3, 0.45), BL('n_b2', 1.55, 0.5), BALL(1.19, 3.06), TP(1.19, 3.06)] },
-      { note: 'Schlag an der Linie entlang – am Block vorbei über die Netzkante', dur: 0.7, els: [ZU(4.6), AA(1.0, 0.1), BL('n_b1', 2.3, 0.2), BL('n_b2', 1.55, 0.25), BALL(0.5, 2.5), TP(1.19, 3.06), UEB(0.5, 2.5), FLUG] },
+      { note: '1. Zuspieler nimmt die Indiaca – Außenangreifer startet links', els: [ZU(4.7), AA(1.5), BL('n_b1', 3.8), BL('n_b2', 2.7), BALL(4.6, 2.3, -0.5)] },
+      { note: 'Hohes Zuspiel nach außen – der Block verschiebt mit', dur: 1.2, els: [ZU(4.7, 0.15), AA(1.15), BL('n_b1', 2.5), BL('n_b2', 1.7), BALL(2.8, 3.6, -0.6)] },
+      { note: 'Absprung – Treffpunkt hoch über der Netzkante', els: [ZU(4.6), AA(1.0, 0.6), BL('n_b1', 2.3, 0.45), BL('n_b2', 1.55, 0.5), BALL(1.19, 3.06, -0.3), TP(1.19, 3.06)] },
+      { note: 'Schlag an der Linie entlang – am Block vorbei über die Netzkante', dur: 0.6, els: [ZU(4.6), AA(1.0, 0.1), BL('n_b1', 2.3, 0.2), BL('n_b2', 1.55, 0.25), BALL(0.5, 2.5, 0), TP(1.19, 3.06), UEB(0.5, 2.5), FLUG] },
+      { note: 'Die Indiaca schlägt tief im gegnerischen Feld an der Linie auf', dur: 0.8, els: [ZU(4.6), AA(1.0), BL('n_b1', 2.3), BL('n_b2', 1.55), BALL(0.3, 0.05, 5.5), TP(1.19, 3.06), UEB(0.5, 2.5), LAND(0.3, 5.5), FLUG, FLUG2] },
     ]),
     netExample('3D: Mittelangriff', [
-      { note: '1. Zuspieler mit der Indiaca – Hauptangreifer läuft in der Mitte an', els: [ZU(4.7), HA(3.1), BL('n_b1', 3.2), BL('n_b2', 4.2), BALL(4.6, 2.3)] },
-      { note: 'Schnelles, kurzes Zuspiel in die Mitte', dur: 0.8, els: [ZU(4.7, 0.1), HA(3.0, 0.35), BL('n_b1', 3.1, 0.1), BL('n_b2', 3.9), BALL(3.6, 2.95)] },
-      { note: 'Absprung – Schlag, bevor der Block steht', dur: 0.7, els: [ZU(4.7), HA(3.0, 0.7), BL('n_b1', 3.0, 0.35), BL('n_b2', 3.7, 0.2), BALL(3.19, 3.23), TP(3.19, 3.23)] },
-      { note: 'Steil über die Netzkante zwischen die Blockhände', dur: 0.6, els: [ZU(4.7), HA(3.0, 0.1), BL('n_b1', 3.0, 0.45), BL('n_b2', 3.7, 0.4), BALL(2.55, 2.48), TP(3.19, 3.23), UEB(2.55, 2.48), FLUG] },
+      { note: '1. Zuspieler mit der Indiaca – Hauptangreifer läuft in der Mitte an', els: [ZU(4.7), HA(3.1), BL('n_b1', 3.2), BL('n_b2', 4.2), BALL(4.6, 2.3, -0.5)] },
+      { note: 'Schnelles, kurzes Zuspiel in die Mitte', dur: 0.8, els: [ZU(4.7, 0.1), HA(3.0, 0.35), BL('n_b1', 3.1, 0.1), BL('n_b2', 3.9), BALL(3.6, 2.95, -0.45)] },
+      { note: 'Absprung – Schlag, bevor der Block steht', dur: 0.7, els: [ZU(4.7), HA(3.0, 0.7), BL('n_b1', 3.0, 0.35), BL('n_b2', 3.7, 0.2), BALL(3.19, 3.23, -0.3), TP(3.19, 3.23)] },
+      { note: 'Steil über die Netzkante zwischen die Blockhände', dur: 0.4, els: [ZU(4.7), HA(3.0, 0.1), BL('n_b1', 3.0, 0.45), BL('n_b2', 3.7, 0.4), BALL(2.55, 2.48, 0), TP(3.19, 3.23), UEB(2.55, 2.48), FLUG] },
+      { note: 'Kurz hinter dem Block im gegnerischen Feld – Punkt', dur: 0.5, els: [ZU(4.7), HA(3.0), BL('n_b1', 3.0), BL('n_b2', 3.7), BALL(2.2, 0.05, 2.6), TP(3.19, 3.23), UEB(2.55, 2.48), LAND(2.2, 2.6), FLUG, FLUG2] },
     ]),
   ];
 }

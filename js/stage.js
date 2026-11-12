@@ -9,7 +9,7 @@ import { teamRot, assignMissingRoles } from './rotation.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox, ui as renderUi } from './render.js';
 import { strokePath } from './stroke.js';
 import { isNet, netH, netCfg, snapToNet, readoutText, makeSil } from './net.js';
-import { render3d, VIEWBOX_3D, unproject3d, silZ, defaultCam3, camAxes } from './net3d.js';
+import { render3d, VIEWBOX_3D, unproject3d, depthOf, defaultCam3, camAxes } from './net3d.js';
 import { FIELDS } from './model.js';
 import { I } from './icons.js';
 
@@ -180,10 +180,14 @@ export function initStage(wrap) {
     const node = ptrs3.size === 1 && !editLock() ? e.target.closest?.('[data-id]') : null;
     const el = node && findEl(node.dataset.id);
     if (el && (el.type === 'marker' || el.type === 'sil')) {
-      const z0 = el.type === 'sil' ? silZ(el) : 0;
+      // Verschiebe-Ebene nach Blickwinkel: frontal (seitlich+Höhe), von der Seite (Tiefe+Höhe), von oben (seitlich+Tiefe).
+      // Silhouetten stehen auf dem Boden → immer Bodenebene (seitlich + Tiefe)
+      const c = getCam3();
+      const Z = depthOf(el), H = el.type === 'marker' ? -el.y : 0;
+      const plane = el.type === 'sil' || c.el > 0.75 ? ['y', H] : Math.abs(Math.sin(c.az)) > 0.6 ? ['x', el.x] : ['z', Z];
       const q = vb3(e.clientX, e.clientY);
-      const w = unproject3d(board(), getCam3(), q.x, q.y, z0);
-      g3 = { kind: 'drag', id: el.id, z0, w0: w, orig: { x: el.x, y: el.y }, cx: e.clientX, cy: e.clientY, moved: false };
+      const w = unproject3d(board(), c, q.x, q.y, ...plane);
+      g3 = { kind: 'drag', id: el.id, plane, w0: w, orig: { x: el.x, y: el.y, d: Z }, cx: e.clientX, cy: e.clientY, moved: false };
       return;
     }
     if (ptrs3.size === 1) startOne({ x: e.clientX, y: e.clientY }, e);
@@ -204,14 +208,16 @@ export function initStage(wrap) {
       }
       const el = findEl(g3.id);
       const q = vb3(e.clientX, e.clientY);
-      const w = unproject3d(board(), getCam3(), q.x, q.y, g3.z0);
+      const w = unproject3d(board(), getCam3(), q.x, q.y, ...g3.plane);
       if (!el || !w || !g3.w0) return;
-      el.x = Math.round((g3.orig.x + w.X - g3.w0.X) * 100) / 100;
-      if (el.type === 'marker') {
-        el.y = Math.min(0, Math.round((g3.orig.y - (w.Y - g3.w0.Y)) * 100) / 100);
-        snapToNet(page(), el);
-        showReadout(e, el.x, el.y);
-      } else showReadout(e, el.x, 0);
+      const r2 = (v) => Math.round(v * 100) / 100;
+      const L2 = (FIELDS[board().fieldType] || FIELDS.indiaca).length / 2;
+      const ax = g3.plane[0];
+      if (ax !== 'x') el.x = r2(g3.orig.x + w.X - g3.w0.X);
+      if (ax !== 'z') el.d = r2(Math.max(-L2 - 2, Math.min(L2 + 2, g3.orig.d + w.Z - g3.w0.Z)));
+      if (el.type === 'marker' && ax !== 'y') el.y = Math.min(0, r2(g3.orig.y - (w.Y - g3.w0.Y)));
+      if (el.type === 'marker' && Math.abs(el.d || 0) < 0.3) snapToNet(page(), el);
+      showReadout(e, el.x, el.type === 'marker' ? el.y : 0, depthOf(el));
       changed();
       return;
     }
@@ -674,9 +680,9 @@ function move(e) {
 }
 
 /** Netzansicht: Höhe und seitliche Position live neben dem Finger/Stift anzeigen */
-function showReadout(e, x, y) {
+function showReadout(e, x, y, d) {
   const wr = readout.parentElement.getBoundingClientRect();
-  readout.textContent = readoutText(page(), board(), x, y);
+  readout.textContent = readoutText(page(), board(), x, y, d);
   readout.style.left = Math.min(wr.width - 10, Math.max(10, e.clientX - wr.left)) + 'px';
   readout.style.top = Math.max(10, e.clientY - wr.top - 70) + 'px';
   readout.classList.add('show');

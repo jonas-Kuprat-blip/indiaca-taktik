@@ -99,12 +99,13 @@ export function snapToNet(p, el) {
 }
 
 /** Text für die Live-Anzeige */
-export function readoutText(p, b, x, y) {
+export function readoutText(p, b, x, y, d) {
   const W = (FIELDS[b.fieldType] || FIELDS.indiaca).width;
   const hgt = Math.max(0, -y);
-  const onNet = Math.abs(hgt - netH(p)) < 0.005;
+  const onNet = Math.abs(hgt - netH(p)) < 0.005 && !(Math.abs(d || 0) >= 0.3);
   const side = x < 0 ? `${fmtM(-x)} links außerhalb` : x > W ? `${fmtM(x - W)} rechts außerhalb` : `${fmtM(x)} von links`;
-  return `${onNet ? 'Netzkante · ' : ''}${fmtM(hgt)} hoch · ${side}`;
+  const depth = typeof d === 'number' && Math.abs(d) >= 0.05 ? ` · ${fmtM(Math.abs(d))} ${d > 0 ? 'im Gegnerfeld' : 'vor dem Netz'}` : '';
+  return `${onNet ? 'Netzkante · ' : ''}${fmtM(hgt)} hoch · ${side}${depth}`;
 }
 
 /** Legende der verwendeten Marker-Farben */

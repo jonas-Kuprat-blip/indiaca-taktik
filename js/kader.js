@@ -2,11 +2,12 @@ import { h, clone } from './util.js';
 import { FIELDS, clampPlayer } from './model.js';
 import { state, emit, board, page, commit, touch, select, createBoard, openBoard, renameBoard, setFieldType, pageFromTemplate } from './store.js';
 import {
-  lib, POS_NUMS, roleName, roleOfPos, posToModel, sideOf, playerById, sortedRoster, squadById, squadPlayers,
+  lib, POS_NUMS, roleName, roleOfPos, posToModel, sideOf, posOfRole, rotOfLaeufer, playerById, sortedRoster, squadById, squadPlayers,
   sortedSquads, defaultLineup, lineupById,
 } from './library.js';
 import { modal, choose, toast } from './ui/dialogs.js';
 import { openStats } from './ui/stats.js';
+import { teamRot } from './rotation.js';
 
 /*
  * Board-Mannschaft, Kader und Platzierung von Kartei-Spielern.
@@ -38,17 +39,19 @@ function teamForPlayer(b, pid) {
   return b.rosterTeam || null;
 }
 
-export function figure(p, team, n, b = board()) {
-  const pt = posToModel(n, sideOf(b, team), b.fieldType);
+/** Kartei-Figur mit Rolle rl; Position = Rolle bei Rotation r (r = 0 → Läufer 2) */
+export function figure(p, team, rl, b = board(), r = 0) {
+  const pos = posOfRole(rl, r);
+  const pt = posToModel(pos, sideOf(b, team), b.fieldType);
   return clampPlayer({
     id: figureId(p.id), type: 'player', rosterId: p.id, team, label: p.name, short: p.kuerzel, number: p.nummer || '',
-    color: teamColor(b, team), size: 1, pos: n, role: roleOfPos(n), x: pt.x, y: pt.y,
+    color: teamColor(b, team), size: 1, rolle: rl, pos, role: roleOfPos(rl), x: pt.x, y: pt.y,
   }, b.fieldType, b.ownSide);
 }
 
 export function askPosition(p) {
-  return choose(`Position für ${p.name}`, 'Auf welche Position soll der Spieler?',
-    POS_NUMS.map((n) => ({ id: n, big: String(n), label: roleName(n) })));
+  return choose(`Rolle für ${p.name}`, 'Welche Rolle übernimmt der Spieler? (Die Position ergibt sich aus dem aktuellen Läufer.)',
+    POS_NUMS.map((n) => ({ id: n, big: 'R' + n, label: roleName(n) })));
 }
 async function askTeam() {
   const t = await choose('Welches Team?', 'Als welches Team sollen Kartei-Spieler auf diesem Board stehen? (Später in den Board-Einstellungen änderbar.)', [
@@ -77,16 +80,17 @@ export async function placeRosterPlayer(pid) {
   if (!team) return;
   const n = p.stdPos || (await askPosition(p));
   if (!n) return;
-  const occ = page().elements.find((e) => e.type === 'player' && e.team === team && e.pos === n);
+  const r = teamRot(team) ?? 0; // aktueller Läufer des Teams
+  const occ = page().elements.find((e) => e.type === 'player' && e.team === team && (e.rolle || e.pos) === n);
   let mode = 'add';
   if (occ) {
-    mode = await choose(`Position ${n} ist belegt`, `${occ.label || 'Eine Figur'} steht schon auf ${roleName(n)}.`, [
+    mode = await choose(`${roleName(n)} ist belegt`, `${occ.label || 'Eine Figur'} spielt schon ${roleName(n)} (Pos. ${posOfRole(n, r)}).`, [
       { id: 'swap', label: 'Tauschen', sub: `${p.name} kommt rein, ${occ.label || 'Figur'} geht raus`, primary: true },
       { id: 'add', label: 'Trotzdem dazustellen' },
     ]);
     if (!mode) return;
   }
-  const fig = figure(p, team, n, b);
+  const fig = figure(p, team, n, b, r);
   commit((pg) => {
     if (mode === 'swap') pg.elements = pg.elements.filter((e) => e.id !== occ.id);
     pg.elements.push(fig);
@@ -95,16 +99,17 @@ export async function placeRosterPlayer(pid) {
 }
 
 /** Aufstellung auf die aktuelle Seite setzen (replace = vorhandene Spieler dieses Teams entfernen) */
-export function applyLineup(sq, lu, team, mode = 'replace', pg = page(), b = board()) {
+export function applyLineup(sq, lu, team, mode = 'replace', pg = page(), b = board(), laeufer = 2) {
+  const r = rotOfLaeufer(laeufer || 2);
   const apply = (p) => {
     if (mode === 'replace') p.elements = p.elements.filter((e) => !(e.type === 'player' && e.team === team));
     for (const n of POS_NUMS) {
       const pl = playerById(lu.slots[n]);
-      if (!pl) continue; // leere Positionen überspringen
-      const fig = figure(pl, team, n, b);
+      if (!pl) continue; // leere Rollen überspringen
+      const fig = figure(pl, team, n, b, r);
       fig.color = sq.farbe;
       const ex = p.elements.find((e) => e.type === 'player' && e.rosterId === pl.id);
-      if (ex) Object.assign(ex, { x: fig.x, y: fig.y, pos: n, role: fig.role, team, color: fig.color });
+      if (ex) Object.assign(ex, { x: fig.x, y: fig.y, pos: fig.pos, rolle: n, role: fig.role, team, color: fig.color });
       else p.elements.push(fig);
     }
   };
@@ -170,7 +175,7 @@ export function openInsertLineup() {
             ]);
             if (!mode) return false;
           }
-          applyLineup(sq, lu, team, mode);
+          applyLineup(sq, lu, team, mode, page(), board(), lu.laeufer);
           toast(`${lu.name} eingesetzt`);
         },
       },
@@ -207,14 +212,15 @@ export function fillPageWithLineups(p, b = board()) {
   if (!plans.length) return p;
   const idMap = {}, used = new Set();
   const apply = (e) => {
-    if (e.type !== 'player' || !e.pos) return e;
+    const rl = e.rolle || e.pos;
+    if (e.type !== 'player' || !rl) return e;
     if (!(e.id in idMap)) {
       idMap[e.id] = null;
       const plan = plans.find((x) => x.t === e.team);
-      const pl = plan && playerById(plan.lu.slots[e.pos]);
+      const pl = plan && playerById(plan.lu.slots[rl]);
       if (pl && !used.has(pl.id)) {
         used.add(pl.id);
-        idMap[e.id] = { id: figureId(pl.id), rosterId: pl.id, label: pl.name, short: pl.kuerzel, number: pl.nummer || '', color: plan.sq.farbe, role: roleOfPos(e.pos) };
+        idMap[e.id] = { id: figureId(pl.id), rosterId: pl.id, label: pl.name, short: pl.kuerzel, number: pl.nummer || '', color: plan.sq.farbe, rolle: rl, role: roleOfPos(rl) };
       }
     }
     return idMap[e.id] ? { ...e, ...idMap[e.id] } : e;
@@ -333,7 +339,7 @@ export function openNewBoard(onDone) {
           const luSel = startBox.querySelector('select');
           if (s && start && luSel) {
             const lu = lineupById(s, luSel.value);
-            if (lu) applyLineup(s, lu, 'own', 'replace', b.pages[0], b);
+            if (lu) applyLineup(s, lu, 'own', 'replace', b.pages[0], b, lu.laeufer);
           }
           touch(b);
           emit('board');

@@ -1,6 +1,6 @@
 import { h, NS, clamp } from '../util.js';
 import { state, set, on } from '../store.js';
-import { lib, POS_NUMS, roleName, setPosition, resetPositions, DEFAULT_POSITIONS, ACTION_CATS, updateAction, addAction, deleteAction, resetActions, libChanged } from '../library.js';
+import { lib, POS_NUMS, roleName, setPosition, resetPositions, DEFAULT_POSITIONS, ACTION_CATS, setRoleName, updateAction, addAction, deleteAction, resetActions, libChanged } from '../library.js';
 import { modal, confirmDlg } from './dialogs.js';
 import { MONTHS } from '../alltime.js';
 import { openHofSettings } from './hof.js';
@@ -22,12 +22,21 @@ export function openSettings() {
   };
   const season = h('select', { class: 'input select', 'aria-label': 'Saisonstart', style: { width: 'auto' } }, MONTHS.map((mn, i) => h('option', { value: i + 1, selected: lib.seasonStart === i + 1 }, mn)));
   season.onchange = () => { lib.seasonStart = +season.value; libChanged(); };
+  const rotToggle = h('button', { class: 'switch' + (state.animRotation !== false ? ' on' : ''), role: 'switch', 'aria-checked': String(state.animRotation !== false), 'aria-label': 'Rotation animieren' }, h('span'));
+  rotToggle.onclick = () => {
+    set({ animRotation: state.animRotation === false });
+    rotToggle.classList.toggle('on', state.animRotation !== false);
+    rotToggle.setAttribute('aria-checked', String(state.animRotation !== false));
+  };
   modal({
     title: 'Einstellungen',
     body: h('div', { class: 'form' },
       h('div', { class: 'set-row' },
-        h('div', {}, h('b', {}, 'Positionsnummern anzeigen'), h('div', { class: 'muted small' }, 'Kleine Nummer 1–5 an Figuren mit Position')),
+        h('div', {}, h('b', {}, 'Positionsnummern anzeigen'), h('div', { class: 'muted small' }, 'Kleine Nummer 1–5 (aktuelle Position) an Figuren')),
         posToggle),
+      h('div', { class: 'set-row' },
+        h('div', {}, h('b', {}, 'Rotation animieren'), h('div', { class: 'muted small' }, 'Beim Drehen gleiten die Spieler in ca. 0,5 s auf ihre neuen Plätze')),
+        rotToggle),
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Vorlagen mit Aufstellung füllen'), h('div', { class: 'muted small' }, 'Beim Laden einer Vorlage die Standard-Aufstellung der Board-Mannschaft einsetzen')),
         fillToggle),
@@ -44,7 +53,7 @@ export function openSettings() {
         h('div', {}, h('b', {}, 'Hall of Fame'), h('div', { class: 'muted small' }, 'Kategorien, Sprüche, Wall of Shame, Mindestwerte')),
         h('button', { class: 'btn text', onclick: openHofSettings }, 'Öffnen')),
       h('div', { class: 'set-row' },
-        h('div', {}, h('b', {}, 'Positionen anpassen'), h('div', { class: 'muted small' }, 'Standardpunkte verschieben und Rollen umbenennen')),
+        h('div', {}, h('b', {}, 'Positionen anpassen'), h('div', { class: 'muted small' }, 'Positionspunkte verschieben und Rollen umbenennen')),
         h('button', { class: 'btn text', onclick: openPositions }, 'Öffnen'))),
     actions: [{ label: 'Fertig', primary: true }],
   });
@@ -103,8 +112,8 @@ export function openPositions() {
   const names = h('div', { class: 'pe-names' });
   const renderNames = () =>
     names.replaceChildren(...POS_NUMS.map((n) => {
-      const i = h('input', { class: 'input', value: roleName(n), 'aria-label': `Rolle Position ${n}` });
-      i.addEventListener('change', () => setPosition(n, { rolle: i.value.trim() || DEFAULT_POSITIONS[n].rolle }));
+      const i = h('input', { class: 'input', value: roleName(n), 'aria-label': `Name Rolle ${n}` });
+      i.addEventListener('change', () => setRoleName(n, i.value));
       return h('label', { class: 'pe-name' }, h('span', { class: 'pe-num' }, String(n)), i);
     }));
   renderNames();
@@ -112,10 +121,10 @@ export function openPositions() {
     title: 'Positionen anpassen',
     wide: true,
     body: h('div', { class: 'pe' },
-      h('div', { class: 'pe-field' }, svg, h('div', { class: 'muted small' }, 'Eigene Feldhälfte, Netz oben. Punkte ziehen zum Verschieben.')),
-      h('div', {}, h('div', { class: 'muted small', style: { marginBottom: '6px' } }, 'Rollennamen (gegen den Uhrzeigersinn ab hinten rechts)'), names)),
+      h('div', { class: 'pe-field' }, svg, h('div', { class: 'muted small' }, 'Eigene Feldhälfte, Netz oben. Die Punkte sind die Positionen 1–5 – ziehen zum Verschieben.')),
+      h('div', {}, h('div', { class: 'muted small', style: { marginBottom: '6px' } }, 'Rollen – in der Grundaufstellung (Läufer 2) steht Rolle n auf Position n. Beim Drehen wandert die Rolle mit dem Spieler.'), names)),
     actions: [
-      { label: 'Zurücksetzen', danger: true, onClick: async () => { if (await confirmDlg('Positionen zurücksetzen?', 'Alle 5 Positionen und Rollennamen werden auf den Standard gesetzt.', { okLabel: 'Zurücksetzen', danger: true })) { resetPositions(); draw(); renderNames(); } return false; } },
+      { label: 'Zurücksetzen', danger: true, onClick: async () => { if (await confirmDlg('Positionen zurücksetzen?', 'Alle 5 Positionspunkte und Rollennamen werden auf den Standard gesetzt.', { okLabel: 'Zurücksetzen', danger: true })) { resetPositions(); draw(); renderNames(); } return false; } },
       { label: 'Fertig', primary: true },
     ],
   });

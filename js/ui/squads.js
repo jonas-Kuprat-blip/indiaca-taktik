@@ -2,7 +2,7 @@ import { h, NS, colorCss } from '../util.js';
 import { I } from '../icons.js';
 import { on } from '../store.js';
 import {
-  lib, POS_NUMS, roleName, sortedRoster, sortedSquads, squadById, squadPlayers, addSquad, updateSquad, deleteSquad,
+  lib, POS_NUMS, roleName, posOfRole, rotOfLaeufer, sortedRoster, sortedSquads, squadById, squadPlayers, addSquad, updateSquad, deleteSquad,
   setSquadMember, addLineup, lineupById, updateLineup, assignSlot, setDefaultLineup, deleteLineup, duplicateLineup, playerById,
 } from '../library.js';
 import { modal, confirmDlg, promptText, colorPicker } from './dialogs.js';
@@ -116,13 +116,16 @@ export function openLineup(squadId, lineupId) {
     if (!a) return;
     let out = `<rect class="pe-out" x="${-HW - PAD}" y="${-PAD}" width="${2 * HW + 2 * PAD}" height="${HL + 2 * PAD}"/><rect class="pe-court" x="${-HW}" y="0" width="${2 * HW}" height="${HL}"/>` +
       `<line class="pe-line" x1="${-HW}" y1="3" x2="${HW}" y2="3"/><rect class="pe-line" x="${-HW}" y="0" width="${2 * HW}" height="${HL}"/><line class="pe-net" x1="${-HW - 0.3}" y1="0" x2="${HW + 0.3}" y2="0"/>`;
+    const r = rotOfLaeufer(a.laeufer || 2);
     for (const n of POS_NUMS) {
-      const p = lib.positions[n];
+      // n = Rolle; sie steht bei diesem Läufer auf Position pos
+      const pos = posOfRole(n, r);
+      const p = lib.positions[pos];
       const pl = playerById(a.slots[n]);
       out += `<g class="lu-slot${pl ? ' filled' : ''}" data-n="${n}" transform="translate(${p.l * HW} ${p.d * HL})"><circle r="0.75" class="pe-hit"/>` +
         `<circle r="0.55" class="lu-dot" style="fill:${pl ? sq.farbe : 'transparent'}"/>` +
-        `<text text-anchor="middle" dominant-baseline="central" font-size="${pl ? 0.42 : 0.5}">${pl ? pl.kuerzel : n}</text>` +
-        `<text class="lu-num" x="0.62" y="-0.55" font-size="0.32">${n}</text></g>`;
+        `<text text-anchor="middle" dominant-baseline="central" font-size="${pl ? 0.42 : 0.42}">${pl ? pl.kuerzel : 'R' + n}</text>` +
+        `<text class="lu-num" x="0.62" y="-0.55" font-size="0.32">${pos}</text></g>`;
     }
     svg.innerHTML = out;
 
@@ -130,12 +133,17 @@ export function openLineup(squadId, lineupId) {
     name.addEventListener('change', () => updateLineup(squadId, lineupId, { name: name.value.trim() || a.name }));
     const std = h('button', { class: 'switch' + (a.standard ? ' on' : ''), role: 'switch', 'aria-checked': String(a.standard), onclick: () => setDefaultLineup(squadId, lineupId) }, h('span'));
     const players = squadPlayers(sq);
+    const rot = (d) => updateLineup(squadId, lineupId, { laeufer: posOfRole(2, rotOfLaeufer(a.laeufer || 2) + d) });
+    const rotRow = h('div', { class: 'lu-rot' },
+      h('button', { class: 'btn text', 'aria-label': 'Zurück drehen', title: 'Zurück drehen (Pos. 1 → 2 …)', onclick: () => rot(1) }, '↺ Zurück'),
+      h('span', { class: 'lu-l' }, h('b', {}, 'Läufer ' + (a.laeufer || 2)), h('span', { class: 'muted small' }, 'Standard dieser Aufstellung')),
+      h('button', { class: 'btn text', 'aria-label': 'Vor drehen', title: 'Vor drehen (Pos. 2 → 1 …)', onclick: () => rot(-1) }, 'Vor ↻'));
     const rows = POS_NUMS.map((n) => {
-      const sel = h('select', { class: 'input select', 'aria-label': `Position ${n}` },
+      const sel = h('select', { class: 'input select', 'aria-label': `Rolle ${n} ${roleName(n)}` },
         h('option', { value: '' }, '– leer –'),
         players.map((p) => h('option', { value: p.id, selected: a.slots[n] === p.id }, `${p.kuerzel} · ${p.name}`)));
       sel.onchange = () => assignSlot(squadId, lineupId, n, sel.value || null);
-      return h('label', { class: 'pe-name' }, h('span', { class: 'pe-num', style: { background: sq.farbe } }, String(n)), h('span', { class: 'lu-role' }, roleName(n)), sel);
+      return h('label', { class: 'pe-name' }, h('span', { class: 'pe-num', style: { background: sq.farbe } }, 'R' + n), h('span', { class: 'lu-role' }, `${roleName(n)} · Pos. ${posOfRole(n, rotOfLaeufer(a.laeufer || 2))}`), sel);
     });
     const chips = h('div', { class: 'lu-chips' },
       ...(players.length
@@ -149,7 +157,7 @@ export function openLineup(squadId, lineupId) {
     body.replaceChildren(
       h('div', { class: 'lu-top' }, name, h('label', { class: 'lu-std' }, std, 'Standard')),
       h('div', { class: 'pe' },
-        h('div', { class: 'pe-field' }, svg, h('div', { class: 'muted small' }, 'Spieler auf eine Position ziehen. Antippen einer belegten Position leert sie.')),
+        h('div', { class: 'pe-field' }, svg, rotRow, h('div', { class: 'muted small' }, 'Spieler auf einen Platz ziehen. Antippen eines belegten Platzes leert ihn. Kleine Zahl = Position.')),
         h('div', { class: 'pe-names' }, ...rows, h('div', { class: 'muted small', style: { marginTop: '6px' } }, 'Spieler der Mannschaft'), chips)));
   };
   const bindChipDrag = (chip, playerId) => {

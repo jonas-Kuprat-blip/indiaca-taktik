@@ -8,7 +8,9 @@ import { state, emit, touch } from './store.js';
  *
  *  lib.roster    = [{ id, name, kuerzel, nummer, stdPos }]                     stdPos: 1–5 oder null
  *  lib.squads    = [{ id, name, farbe, spielerIds, aufstellungen: [{ id, name, standard, slots: {1..5: spielerId|null} }] }]
- *  lib.positions = { 1..5: { rolle, d, l } }
+ *  lib.positions = { 1..5: { d, l } }        Feldpunkte der Positionen
+ *  lib.roles     = { 1..5: Name }           Rollen R1–R5 (Grundaufstellung Läufer 2)
+ *  Aufstellung: slots nach Rolle, laeufer = Standard-Läufer
  *
  * Positionen sind relativ zur eigenen Feldhälfte gespeichert (gedacht im Hochformat, Netz oben):
  *   d = Abstand zum Netz als Anteil der halben Feldlänge (0 = Netz, 1 = Grundlinie)
@@ -23,6 +25,19 @@ export const DEFAULT_POSITIONS = {
   5: { rolle: '2. Mitte', d: 0.75, l: -0.55 },
 };
 export const POS_NUMS = [1, 2, 3, 4, 5];
+
+/*
+ * Rolle ≠ Position: Die Rolle (R1–R5) gehört zum Spieler, die Position (1–5) ist der Platz auf dem Feld.
+ * Rollen sind nach ihrer Position in der Grundaufstellung „Läufer 2“ nummeriert (R2 = 1. Zuspieler auf Pos. 2).
+ * Rotation r (0–4): Position = Rolle + r (zyklisch). Läufer = Position des 1. Zuspielers = 2 + r.
+ *   „Zurück drehen“ = r + 1 (Pos. 1 → 2 → 3 → 4 → 5 → 1) · „Vor drehen“ = r − 1
+ */
+export const DEFAULT_ROLES = { 1: 'Außenangreifer', 2: '1. Zuspieler', 3: 'Hauptangreifer', 4: '2. Zuspieler', 5: '2. Mitte' };
+export const mod5 = (n) => ((n % 5) + 5) % 5;
+export const posOfRole = (rolle, r = 0) => mod5(rolle - 1 + r) + 1;
+export const roleAtPos = (pos, r = 0) => mod5(pos - 1 - r) + 1;
+export const laeuferOf = (r = 0) => posOfRole(2, r);
+export const rotOfLaeufer = (L) => mod5(L - 2);
 
 /*
  * Statistik-Aktionen (app-weit). sign: +1 positiv · −1 negativ · 0 neutral (für Quoten/Hall of Fame)
@@ -62,7 +77,7 @@ function normActions(list) {
   return out;
 }
 
-export const lib = { roster: [], squads: [], positions: clone(DEFAULT_POSITIONS), archived: [], actions: normActions(), seasonStart: 8, hof: null };
+export const lib = { roster: [], squads: [], positions: clone(DEFAULT_POSITIONS), roles: { ...DEFAULT_ROLES }, archived: [], actions: normActions(), seasonStart: 8, hof: null };
 
 export async function loadLibrary() {
   const d = await db.getMeta('library');
@@ -76,9 +91,13 @@ function applyLibrary(d) {
   lib.seasonStart = d.seasonStart >= 1 && d.seasonStart <= 12 ? +d.seasonStart : 8;
   lib.hof = d.hof && typeof d.hof === 'object' ? d.hof : null;
   lib.positions = clone(DEFAULT_POSITIONS);
+  lib.roles = { ...DEFAULT_ROLES };
   for (const n of POS_NUMS) {
     const p = d.positions?.[n];
-    if (p && Number.isFinite(p.d) && Number.isFinite(p.l)) lib.positions[n] = { rolle: p.rolle || DEFAULT_POSITIONS[n].rolle, d: p.d, l: p.l };
+    if (p && Number.isFinite(p.d) && Number.isFinite(p.l)) lib.positions[n] = { rolle: DEFAULT_POSITIONS[n].rolle, d: p.d, l: p.l };
+    // Rollennamen: früher an der Position gespeichert (Grundaufstellung = Läufer 2 → gleiche Nummer)
+    const rn = d.roles?.[n] ?? p?.rolle;
+    if (typeof rn === 'string' && rn.trim()) lib.roles[n] = rn.trim();
   }
 }
 const normPlayer = (p) => ({ id: p.id, name: String(p.name).trim(), kuerzel: (p.kuerzel || initials(p.name)).slice(0, 4), nummer: p.nummer ?? '', stdPos: POS_NUMS.includes(+p.stdPos) ? +p.stdPos : null });
@@ -87,7 +106,7 @@ function normSquad(s) {
     id: s.id, name: s.name || 'Mannschaft', farbe: s.farbe || '#2563eb',
     spielerIds: Array.isArray(s.spielerIds) ? [...new Set(s.spielerIds)] : [],
     aufstellungen: (Array.isArray(s.aufstellungen) ? s.aufstellungen : []).map((a) => ({
-      id: a.id || uid(), name: a.name || 'Aufstellung', standard: !!a.standard,
+      id: a.id || uid(), name: a.name || 'Aufstellung', standard: !!a.standard, laeufer: POS_NUMS.includes(+a.laeufer) ? +a.laeufer : 2,
       slots: Object.fromEntries(POS_NUMS.map((n) => [n, a.slots?.[n] || null])),
     })),
   };
@@ -124,9 +143,15 @@ export function resetActions() {
 }
 
 // ---------- Positionen ----------
-export const roleName = (n) => lib.positions[n]?.rolle || `Position ${n}`;
-/** Für die Noten-Statistik: 1. und 2. Zuspieler werden als Zuspieler bewertet */
-export const roleOfPos = (n) => (n === 2 || n === 4 ? 'zuspiel' : 'angriff');
+/** Name der Rolle R1–R5 (z. B. „1. Zuspieler“) */
+export const roleName = (n) => lib.roles[n] || DEFAULT_ROLES[n] || `Rolle ${n}`;
+export function setRoleName(n, name) {
+  lib.roles[n] = String(name || '').trim() || DEFAULT_ROLES[n];
+  libChanged();
+}
+/** Für die Noten-Statistik: Rollen 1. und 2. Zuspieler werden als Zuspieler bewertet */
+export const roleOfPos = (rolle) => (rolle === 2 || rolle === 4 ? 'zuspiel' : 'angriff');
+export const gradeRole = roleOfPos;
 /** Feldseite eines Teams auf dem Board ('left' = Modell x < 0) */
 export const sideOf = (b, team) => {
   const own = b?.ownSide === 'right' ? 'right' : 'left';
@@ -146,6 +171,7 @@ export function setPosition(n, patch) {
 }
 export function resetPositions() {
   lib.positions = clone(DEFAULT_POSITIONS);
+  lib.roles = { ...DEFAULT_ROLES };
   libChanged();
 }
 
@@ -252,7 +278,7 @@ export function setSquadMember(squadId, playerId, member) {
 }
 export function addLineup(squadId, name) {
   const sq = squadById(squadId);
-  const a = { id: uid(), name: name || `Aufstellung ${sq.aufstellungen.length + 1}`, standard: !sq.aufstellungen.length, slots: emptySlots() };
+  const a = { id: uid(), name: name || `Aufstellung ${sq.aufstellungen.length + 1}`, standard: !sq.aufstellungen.length, laeufer: 2, slots: emptySlots() };
   sq.aufstellungen.push(a);
   libChanged();
   return a;
@@ -320,7 +346,8 @@ export function importLibrary(d) {
   lib.seasonStart = cur.seasonStart;
   lib.roster = roster;
   lib.squads = squads;
-  lib.positions = cur.positions; // eigene Positionen nicht überschreiben
+  lib.positions = cur.positions; // eigene Positionen und Rollennamen nicht überschreiben
+  lib.roles = cur.roles;
   libChanged();
   return { np, ns };
 }

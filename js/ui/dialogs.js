@@ -129,7 +129,7 @@ export function colorPicker(anchor, current, onPick, { allowInk = true } = {}) {
   place(pop, anchor);
 }
 
-function place(pop, anchor) {
+export function place(pop, anchor) {
   const r = anchor.getBoundingClientRect();
   const pr = pop.getBoundingClientRect();
   let x = r.left;

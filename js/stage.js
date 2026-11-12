@@ -4,7 +4,8 @@ import {
   state, board, page, findEl, commit, snapshot, changed, select, on, emit, set, switchPage, pageIndex, scale, activeServeType, setTool, pageOrientation,
 } from './store.js';
 import { clampPlayer } from './model.js';
-import { posToModel, sideOf, roleOfPos } from './library.js';
+import { posToModel, sideOf, roleOfPos, roleAtPos } from './library.js';
+import { teamRot } from './rotation.js';
 import { renderField, renderElements, renderSelection, renderOne, viewBox, worldTransform, modelBox, ui as renderUi } from './render.js';
 import { strokePath } from './stroke.js';
 import { I } from './icons.js';
@@ -274,7 +275,9 @@ export function addPlayerDefault(team, number) {
   const pt = posToModel(number, sideOf(board(), team), board().fieldType);
   const taken = (q) => page().elements.some((e) => e.type === 'player' && dist(e, q) < 0.4);
   for (let i = 0; i < 6 && taken(pt); i++) pt.y += 0.9 * (pt.y > 0 ? -1 : 1);
-  commit((p) => p.elements.push(playerEl(team, number, pt, { pos: number, role: roleOfPos(number) })));
+  // Rolle aus der Position und dem aktuellen Läufer des Teams (ohne Figuren mit Rolle: Läufer 2)
+  const rolle = roleAtPos(number, teamRot(team) ?? 0);
+  commit((p) => p.elements.push(playerEl(team, number, pt, { pos: number, rolle, role: roleOfPos(rolle) })));
 }
 
 // ---------- Pointer-Logik ----------

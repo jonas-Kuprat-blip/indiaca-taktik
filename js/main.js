@@ -8,6 +8,7 @@ import { initSelectionBar } from './ui/selection.js';
 import { initAnim } from './anim.js';
 import { initStatsTab } from './ui/stats.js';
 import { initPhone } from './phone.js';
+import { initRotBar } from './ui/rotbar.js';
 import { loadLibrary } from './library.js';
 
 // iOS: Pinch-Zoom & Doppeltipp-Zoom der Seite unterbinden
@@ -25,6 +26,7 @@ async function start() {
   initPalette(document.getElementById('palette'));
   initNotes(document.getElementById('notes'), wrap);
   initStatsTab(wrap);
+  initRotBar(wrap);
   initPagebar(document.getElementById('pagebar'));
   initPhone();
   store.emit('board');

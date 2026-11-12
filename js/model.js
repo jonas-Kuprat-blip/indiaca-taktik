@@ -31,6 +31,8 @@ export function newPage(kind = 'taktik', name = 'Seite') {
 
 /** Alte Datenformate auf das aktuelle bringen (z. B. Rechteck-Zonen → Polygon mit 4 Ecken) */
 export function migrateElement(e) {
+  // Rolle (R1–R5) getrennt von der Position: bisher galt Grundaufstellung Läufer 2 → Rolle = Position
+  if (e.type === 'player' && e.pos && !e.rolle) e.rolle = e.pos;
   if (e.type === 'zone' && e.shape === 'rect' && 'w' in e) {
     const { x, y, w, h } = e;
     e.shape = 'poly';
@@ -72,6 +74,7 @@ export function ensureAnim(p) {
     s.id ||= uid();
     s.note ||= '';
     s.dur = +s.dur > 0 ? +s.dur : 1;
+    if (s.els && typeof s.els === 'object') Object.values(s.els).forEach(migrateElement);
     if (!s.els || typeof s.els !== 'object') {
       // Migration aus dem alten Format (nur Spieler-Positionen)
       s.els = {};

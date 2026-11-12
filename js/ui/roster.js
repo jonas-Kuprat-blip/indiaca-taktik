@@ -20,7 +20,7 @@ export function openRoster() {
               h('span', { class: 'ros-badge' }, p.kuerzel || '?'),
               h('button', { class: 'ros-main', onclick: () => openProfile(p.id, { onEdit: editPlayer }) },
                 h('b', {}, p.name),
-                h('span', { class: 'muted small' }, [p.nummer !== '' && p.nummer != null ? `#${p.nummer}` : null, p.stdPos ? `Pos. ${p.stdPos} · ${roleName(p.stdPos)}` : 'keine Standardposition'].filter(Boolean).join(' · '))),
+                h('span', { class: 'muted small' }, [p.nummer !== '' && p.nummer != null ? `#${p.nummer}` : null, p.stdPos ? roleName(p.stdPos) : 'keine Standardrolle'].filter(Boolean).join(' · '))),
               h('button', { class: 'btn', 'aria-label': `${p.name} bearbeiten`, html: I.edit, onclick: () => editPlayer(p.id) }),
               h('button', { class: 'btn danger-ic', 'aria-label': `${p.name} löschen`, html: I.trash, onclick: () => removePlayer(p.id) })))
         : [h('p', { class: 'muted' }, lib.roster.length ? 'Kein Spieler gefunden.' : 'Noch keine Spieler angelegt. Tippe auf „+ Spieler“.')]),
@@ -77,7 +77,7 @@ export function editPlayer(id, { onSaved } = {}) {
   const renderPos = () =>
     posBox.replaceChildren(
       h('button', { class: 'pos-btn' + (!pos ? ' active' : ''), onclick: () => { pos = null; renderPos(); } }, h('b', {}, '–'), h('span', {}, 'keine')),
-      ...POS_NUMS.map((n) => h('button', { class: 'pos-btn' + (pos === n ? ' active' : ''), onclick: () => { pos = n; renderPos(); } }, h('b', {}, String(n)), h('span', {}, roleName(n))))
+      ...POS_NUMS.map((n) => h('button', { class: 'pos-btn' + (pos === n ? ' active' : ''), onclick: () => { pos = n; renderPos(); } }, h('b', {}, 'R' + n), h('span', {}, roleName(n))))
     );
   renderPos();
   const field = (label, input) => h('label', { class: 'form-row' }, h('span', {}, label), input);
@@ -86,7 +86,7 @@ export function editPlayer(id, { onSaved } = {}) {
     body: h('div', { class: 'form' },
       field('Name', name),
       h('div', { class: 'form-2' }, field('Kürzel (auf der Figur)', kz), field('Rückennummer', nr)),
-      h('div', { class: 'form-row' }, h('span', {}, 'Standardposition'), posBox)),
+      h('div', { class: 'form-row' }, h('span', {}, 'Standardrolle'), posBox)),
     actions: [
       { label: 'Abbrechen' },
       {

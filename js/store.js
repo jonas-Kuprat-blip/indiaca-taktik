@@ -23,6 +23,7 @@ export const state = {
   theme: 'auto',
   viewLocked: false, // Ansicht eingefroren (kein Zoom/Verschieben/Drehen)
   showPosNumbers: false,
+  animRotation: true, // Rotation: Figuren gleiten auf die neuen Plätze
   fillTemplates: true, // Vorlagen beim Laden mit Standard-Aufstellung füllen // Positionsnummern 1–5 auf den Figuren
   orientation: 'hoch', // hoch = Netz waagerecht, eigene Hälfte unten | quer
 };
@@ -124,7 +125,7 @@ export function touch(b = board()) {
 }
 export const flushNow = () => flush();
 
-const PREF_KEYS = ['color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme', 'orientation', 'viewLocked', 'showPosNumbers', 'fillTemplates'];
+const PREF_KEYS = ['color', 'width', 'arrowDashed', 'markerSymbol', 'notesOpen', 'palmRejection', 'theme', 'orientation', 'viewLocked', 'showPosNumbers', 'fillTemplates', 'animRotation'];
 const savePrefs = debounce(() => {
   const p = {};
   PREF_KEYS.forEach((k) => (p[k] = state[k]));

@@ -37,7 +37,7 @@ export function openProfile(pid, { onEdit } = {}) {
     const head = h('div', { class: 'prof-head' },
       h('span', { class: 'ros-badge big' }, p.kuerzel || '?'),
       h('div', { class: 'prof-name' }, h('b', {}, p.name),
-        h('span', { class: 'muted small' }, [p.nummer !== '' && p.nummer != null ? `#${p.nummer}` : null, p.stdPos ? `Pos. ${p.stdPos} · ${roleName(p.stdPos)}` : null, playerById(pid) ? null : 'archiviert'].filter(Boolean).join(' · '))),
+        h('span', { class: 'muted small' }, [p.nummer !== '' && p.nummer != null ? `#${p.nummer}` : null, p.stdPos ? roleName(p.stdPos) : null, playerById(pid) ? null : 'archiviert'].filter(Boolean).join(' · '))),
       onEdit && playerById(pid) ? h('button', { class: 'btn text', html: I.edit + 'Bearbeiten', onclick: () => onEdit(pid) }) : null);
 
     if (!s.n) {

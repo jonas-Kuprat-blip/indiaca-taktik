@@ -356,7 +356,7 @@ function example(name, steps) {
     if (id === 'ball') return { id, type: 'marker', symbol: 'indiaca', color: '#dc2626', label: '', size: 1, x, y };
     const team = id[0] === 'o' ? 'opp' : 'own';
     const pos = +id.slice(1);
-    return { id, type: 'player', team, color: b.teams[team].color, size: 1, label: '', number: '', pos, role: roleOfPos(pos), x, y };
+    return { id, type: 'player', team, color: b.teams[team].color, size: 1, label: '', number: '', pos, rolle: pos, role: roleOfPos(pos), x, y };
   };
   const pg = {
     id: uid(), kind: 'anim', name, notes: '', elements: [],

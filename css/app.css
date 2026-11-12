@@ -554,6 +554,17 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system
 .rb-opt.active { background: var(--accent); color: #fff; }
 .rb-roles { margin-top: 8px; display: grid; gap: 1px; }
 
+/* ---------- Spiel-Setup ---------- */
+.setup-cols { display: grid; grid-template-columns: 1fr 52px 1fr; gap: 8px; align-items: center; }
+.setup-col { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 14px; background: var(--panel2); border-top: 5px solid var(--team); color: var(--text); font-weight: 400; }
+.setup-h { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.setup-typ { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--panel); color: var(--muted); }
+.setup-new { align-self: flex-start; font-size: 13px; min-height: 40px; }
+.setup-swap { width: 52px; height: 52px; font-size: 24px; border-radius: 50%; background: var(--panel2); }
+.setup .laeufer-seg .seg-btn { min-width: 0; flex: 1; padding: 0 6px; }
+.setup .laeufer-seg { width: 100%; }
+.ext-tag { margin-left: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 1px 5px; border-radius: 5px; background: var(--panel2); color: var(--muted); vertical-align: middle; }
+
 /* ---------- Kleine Bildschirme ---------- */
 @media (max-width: 820px) {
   #main { grid-template-columns: 100px minmax(0, 1fr) 0; }
@@ -791,3 +802,5 @@ html.phone #stage-wrap.anim .rotbar:not(.top) { bottom: 60px; }
 .lu-rot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
 .lu-l { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
 .laeufer-seg .seg-btn { min-width: 52px; height: 44px; }
+html.phone .setup-cols { grid-template-columns: 1fr; }
+html.phone .setup-swap { justify-self: center; }

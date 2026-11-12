@@ -6,8 +6,8 @@ import { state, emit, touch } from './store.js';
 /*
  * App-weite Bibliothek (gilt für alle Boards): Spielerkartei, Mannschaften, Positionen.
  *
- *  lib.roster    = [{ id, name, kuerzel, nummer, stdPos }]                     stdPos: 1–5 oder null
- *  lib.squads    = [{ id, name, farbe, spielerIds, aufstellungen: [{ id, name, standard, slots: {1..5: spielerId|null} }] }]
+ *  lib.roster    = [{ id, name, kuerzel, nummer, stdPos, extern? }]            stdPos = Standardrolle 1–5 oder null; extern = Gegner-Spieler
+ *  lib.squads    = [{ id, name, farbe, typ: eigen|gegner, spielerIds, aufstellungen: [{ id, name, standard, slots: {1..5: spielerId|null} }] }]
  *  lib.positions = { 1..5: { d, l } }        Feldpunkte der Positionen
  *  lib.roles     = { 1..5: Name }           Rollen R1–R5 (Grundaufstellung Läufer 2)
  *  Aufstellung: slots nach Rolle, laeufer = Standard-Läufer
@@ -100,10 +100,10 @@ function applyLibrary(d) {
     if (typeof rn === 'string' && rn.trim()) lib.roles[n] = rn.trim();
   }
 }
-const normPlayer = (p) => ({ id: p.id, name: String(p.name).trim(), kuerzel: (p.kuerzel || initials(p.name)).slice(0, 4), nummer: p.nummer ?? '', stdPos: POS_NUMS.includes(+p.stdPos) ? +p.stdPos : null });
+const normPlayer = (p) => ({ id: p.id, name: String(p.name).trim(), kuerzel: (p.kuerzel || initials(p.name)).slice(0, 4), nummer: p.nummer ?? '', stdPos: POS_NUMS.includes(+p.stdPos) ? +p.stdPos : null, ...(p.extern ? { extern: true } : {}) });
 function normSquad(s) {
   return {
-    id: s.id, name: s.name || 'Mannschaft', farbe: s.farbe || '#2563eb',
+    id: s.id, name: s.name || 'Mannschaft', farbe: s.farbe || '#2563eb', typ: s.typ === 'gegner' ? 'gegner' : 'eigen',
     spielerIds: Array.isArray(s.spielerIds) ? [...new Set(s.spielerIds)] : [],
     aufstellungen: (Array.isArray(s.aufstellungen) ? s.aufstellungen : []).map((a) => ({
       id: a.id || uid(), name: a.name || 'Aufstellung', standard: !!a.standard, laeufer: POS_NUMS.includes(+a.laeufer) ? +a.laeufer : 2,

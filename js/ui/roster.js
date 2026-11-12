@@ -7,19 +7,23 @@ import { playerHasStats, purgePlayerStats } from '../gamestats.js';
 import { openProfile } from './profile.js';
 
 /** Menüpunkt „Spieler“: Spielerkartei (app-weit, für alle Boards) */
+let showExtern = false;
 export function openRoster() {
   const search = h('input', { class: 'input', type: 'search', placeholder: 'Spieler suchen …', enterkeyhint: 'search' });
   const listEl = h('div', { class: 'ros-list' });
   const render = () => {
     const q = search.value.trim().toLowerCase();
-    const list = sortedRoster().filter((p) => !q || p.name.toLowerCase().includes(q) || p.kuerzel.toLowerCase().includes(q) || String(p.nummer).includes(q));
+    const ext = lib.roster.filter((p) => p.extern).length;
+    externBtn.textContent = showExtern ? `Externe ausblenden (${ext})` : `Externe anzeigen (${ext})`;
+    externBtn.style.display = ext ? '' : 'none';
+    const list = sortedRoster().filter((p) => showExtern || !p.extern).filter((p) => !q || p.name.toLowerCase().includes(q) || p.kuerzel.toLowerCase().includes(q) || String(p.nummer).includes(q));
     listEl.replaceChildren(
       ...(list.length
         ? list.map((p) =>
             h('div', { class: 'ros-row' },
               h('span', { class: 'ros-badge' }, p.kuerzel || '?'),
               h('button', { class: 'ros-main', onclick: () => openProfile(p.id, { onEdit: editPlayer }) },
-                h('b', {}, p.name),
+                h('b', {}, p.name, p.extern ? h('span', { class: 'ext-tag' }, 'extern') : null),
                 h('span', { class: 'muted small' }, [p.nummer !== '' && p.nummer != null ? `#${p.nummer}` : null, p.stdPos ? roleName(p.stdPos) : 'keine Standardrolle'].filter(Boolean).join(' · '))),
               h('button', { class: 'btn', 'aria-label': `${p.name} bearbeiten`, html: I.edit, onclick: () => editPlayer(p.id) }),
               h('button', { class: 'btn danger-ic', 'aria-label': `${p.name} löschen`, html: I.trash, onclick: () => removePlayer(p.id) })))
@@ -34,12 +38,13 @@ export function openRoster() {
         : [])
     );
   };
+  const externBtn = h('button', { class: 'btn text', onclick: () => { showExtern = !showExtern; render(); } });
   search.addEventListener('input', render);
   const m = modal({
     title: 'Spieler',
     wide: true,
     body: h('div', { class: 'ros' },
-      h('div', { class: 'ros-top' }, search, h('button', { class: 'btn text primary', onclick: () => editPlayer(null) }, '+ Spieler')),
+      h('div', { class: 'ros-top' }, search, externBtn, h('button', { class: 'btn text primary', onclick: () => editPlayer(null) }, '+ Spieler')),
       listEl,
       h('p', { class: 'muted small' }, 'Spieler antippen: Profil mit All-Time-Stats. Die Kartei gilt für alle Boards; Namensänderungen werden überall übernommen.')),
   });

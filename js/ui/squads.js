@@ -8,16 +8,14 @@ import {
 import { modal, confirmDlg, promptText, colorPicker } from './dialogs.js';
 import { editPlayer } from './roster.js';
 import { laeuferSeg } from '../kader.js';
+import { openNewOpponent } from './setup.js';
 
 const live = (m, render) => on('library', () => document.body.contains(m.box) && render());
 
 /** Menüpunkt „Mannschaften“ */
 export function openSquads() {
   const listEl = h('div', { class: 'ros-list' });
-  const render = () =>
-    listEl.replaceChildren(
-      ...(lib.squads.length
-        ? sortedSquads().map((sq) =>
+  const row = (sq) =>
             h('div', { class: 'ros-row' },
               h('span', { class: 'sq-dot', style: { background: sq.farbe } }),
               h('button', { class: 'ros-main', onclick: () => openSquad(sq.id) },
@@ -27,14 +25,23 @@ export function openSquads() {
               h('button', {
                 class: 'btn danger-ic', 'aria-label': `${sq.name} löschen`, html: I.trash,
                 onclick: async () => { if (await confirmDlg('Mannschaft löschen?', `„${sq.name}“ mit allen Aufstellungen wird gelöscht. Die Spieler bleiben in der Kartei.`, { okLabel: 'Löschen', danger: true })) deleteSquad(sq.id); },
-              })))
+              }));
+  const render = () => {
+    const own = sortedSquads().filter((s) => s.typ !== 'gegner');
+    const opp = sortedSquads().filter((s) => s.typ === 'gegner');
+    listEl.replaceChildren(
+      ...(lib.squads.length
+        ? [h('h3', {}, `Eigene Mannschaften (${own.length})`), ...own.map(row),
+           ...(opp.length ? [h('h3', {}, `Gegner / Liga (${opp.length})`), ...opp.map(row)] : [])]
         : [h('p', { class: 'muted' }, 'Noch keine Mannschaften. Tippe auf „+ Mannschaft“.')])
     );
+  };
   const m = modal({
     title: 'Mannschaften',
     wide: true,
     body: h('div', { class: 'ros' },
       h('div', { class: 'ros-top' }, h('div', { style: { flex: 1 } }),
+        h('button', { class: 'btn text', onclick: () => openNewOpponent((sq) => openSquad(sq.id)) }, '+ Gegner'),
         h('button', { class: 'btn text primary', onclick: async () => { const n = await promptText('Neue Mannschaft', '', { placeholder: 'z. B. Herren 1', okLabel: 'Anlegen' }); if (n) openSquad(addSquad({ name: n }).id); } }, '+ Mannschaft')),
       listEl),
   });
@@ -59,7 +66,7 @@ export function openSquad(id) {
     const members = h('div', { class: 'sq-members' });
     const renderMembers = () => {
       const t = search.value.trim().toLowerCase();
-      const all = sortedRoster().filter((p) => !t || p.name.toLowerCase().includes(t) || p.kuerzel.toLowerCase().includes(t));
+      const all = sortedRoster().filter((p) => sq.typ === 'gegner' || !p.extern || sq.spielerIds.includes(p.id)).filter((p) => !t || p.name.toLowerCase().includes(t) || p.kuerzel.toLowerCase().includes(t));
       members.replaceChildren(
         ...(all.length
           ? all.map((p) => {
@@ -87,8 +94,12 @@ export function openSquad(id) {
           })
         : [h('p', { class: 'muted small' }, 'Noch keine Aufstellung.')]));
 
+    const typ = h('div', { class: 'seg' },
+      [['eigen', 'Eigene Mannschaft'], ['gegner', 'Gegner / Liga']].map(([k, l]) =>
+        h('button', { class: 'seg-btn' + ((sq.typ || 'eigen') === k ? ' active' : ''), onclick: () => updateSquad(id, { typ: k }) }, l)));
     body.replaceChildren(
       h('div', { class: 'sq-head' }, colorBtn, name),
+      h('div', { class: 'form-row' }, h('span', {}, sq.typ === 'gegner' ? 'Typ – zählt nicht in Hall of Fame und Siegquoten' : 'Typ'), typ),
       h('h3', {}, `Spieler (${sq.spielerIds.length})`),
       h('div', { class: 'ros-top' }, search, h('button', { class: 'btn text', onclick: () => editPlayer(null, { onSaved: (p) => setSquadMember(id, p.id, true) }) }, '+ Neuer Spieler')),
       members,

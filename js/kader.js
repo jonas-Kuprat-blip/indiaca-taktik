@@ -8,6 +8,7 @@ import {
 import { modal, choose, toast } from './ui/dialogs.js';
 import { openStats } from './ui/stats.js';
 import { teamRot } from './rotation.js';
+import { setupEditor, writeSetup, placeSetup, boardSetupSection } from './ui/setup.js';
 
 /*
  * Board-Mannschaft, Kader und Platzierung von Kartei-Spielern.
@@ -24,7 +25,7 @@ export const figureId = (rosterId) => 'r_' + rosterId;
 /** Für die Palette: verfügbare Spieler, gruppiert */
 export function kaderGroups(b = board()) {
   const { own, opp } = boardSquads(b);
-  if (!own && !opp) return [{ team: null, title: 'Kartei', color: null, players: sortedRoster() }];
+  if (!own && !opp) return [{ team: null, title: 'Kartei', color: null, players: sortedRoster().filter((p) => !p.extern) }];
   const g = [];
   if (own) g.push({ team: 'own', title: own.name, color: own.farbe, players: squadPlayers(own) });
   if (opp) g.push({ team: 'opp', title: opp.name, color: opp.farbe, players: squadPlayers(opp) });
@@ -206,7 +207,7 @@ export function mirrorPage(p) {
   for (const s of p.anim?.steps || []) Object.values(s.els || {}).forEach(mirrorEl);
   return p;
 }
-function mirrorBoard(b) {
+export function mirrorBoard(b) {
   b.pages.forEach(mirrorPage);
 }
 
@@ -218,7 +219,7 @@ function mirrorBoard(b) {
 export function fillPageWithLineups(p, b = board()) {
   if (state.fillTemplates === false) return p;
   const { own, opp } = boardSquads(b);
-  const plans = [['own', own], ['opp', opp]].map(([t, sq]) => ({ t, sq, lu: defaultLineup(sq) })).filter((x) => x.sq && x.lu);
+  const plans = [['own', own], ['opp', opp]].map(([t, sq]) => ({ t, sq, lu: lineupById(sq, b.setup?.[t]?.lineupId) || defaultLineup(sq) })).filter((x) => x.sq && x.lu);
   if (!plans.length) return p;
   const idMap = {}, used = new Set();
   const apply = (e) => {
@@ -246,7 +247,6 @@ export function pageFromTpl(t, b = board()) {
   return fillPageWithLineups(p, b);
 }
 
-const squadOptions = (cur) => [h('option', { value: '' }, '– keine –'), ...sortedSquads().map((s) => h('option', { value: s.id, selected: s.id === cur }, s.name))];
 
 /** Board-Einstellungen: Name, Feld, Mannschaft, Gegner, Seite */
 export function openBoardSettings(b = board()) {
@@ -256,83 +256,47 @@ export function openBoardSettings(b = board()) {
     name.addEventListener('change', () => renameBoard(b.id, name.value.trim() || b.name));
     const ft = h('select', { class: 'input select' }, Object.entries(FIELDS).map(([k, f]) => h('option', { value: k, selected: b.fieldType === k }, f.label)));
     ft.onchange = () => setFieldType(b.id, ft.value);
-    const sq = h('select', { class: 'input select' }, squadOptions(b.squadId));
-    const op = h('select', { class: 'input select' }, squadOptions(b.oppSquadId));
-    const setSq = (key, v) => {
-      if (v) b[key] = v;
-      else delete b[key];
-      touch(b);
-      emit('board');
-      emit('boardSquad');
-      render();
-    };
-    sq.onchange = () => setSq('squadId', sq.value);
-    op.onchange = () => setSq('oppSquadId', op.value);
-    const side = h('div', { class: 'seg' },
-      ...['left', 'right'].map((s) =>
-        h('button', {
-          class: 'seg-btn' + ((b.ownSide || 'left') === s ? ' active' : ''),
-          onclick: () => {
-            if ((b.ownSide || 'left') === s) return;
-            b.ownSide = s;
-            mirrorBoard(b); // Aufstellungen bleiben zum Netz hin richtig
-            touch(b);
-            emit('board');
-            emit('page');
-            emit('elements');
-            render();
-          },
-        }, s === 'left' ? 'Links' : 'Rechts')));
     const rt = h('div', { class: 'seg' },
       ...[['own', 'Eigenes Team'], ['opp', 'Gegner']].map(([t, l]) =>
         h('button', { class: 'seg-btn' + (b.rosterTeam === t ? ' active' : ''), onclick: () => { b.rosterTeam = t; touch(b); render(); } }, l)));
-    body.replaceChildren(
+    body.replaceChildren(...[
       h('label', { class: 'form-row' }, h('span', {}, 'Name'), name),
       h('label', { class: 'form-row' }, h('span', {}, 'Feld'), ft),
-      h('div', { class: 'form-2' },
-        h('label', { class: 'form-row' }, h('span', {}, 'Mannschaft'), sq),
-        h('label', { class: 'form-row' }, h('span', {}, 'Gegner-Mannschaft'), op)),
-      h('div', { class: 'form-row' }, h('span', {}, 'Seite der eigenen Mannschaft (Querformat)'), side),
+      boardSetupSection(b),
       !b.squadId && !b.oppSquadId ? h('div', { class: 'form-row' }, h('span', {}, 'Kartei-Spieler ohne Mannschaft stehen als'), rt) : null,
       h('div', { class: 'set-row' },
         h('div', {}, h('b', {}, 'Spiel-Infos & Statistik'), h('div', { class: 'muted small' }, b.game?.isGame ? 'Als Spiel markiert' : 'Datum, Gegner, Wettbewerb, Ergebnis')),
         h('button', { class: 'btn text', onclick: () => { if (b.id !== state.boardId) openBoard(b.id); m.close(); openStats('spiel'); } }, 'Öffnen')),
-      h('p', { class: 'muted small' }, 'Die Mannschaft gilt für alle Seiten dieses Boards. Beim Seitenwechsel wird das Board gespiegelt.'));
+      h('p', { class: 'muted small' }, 'Das Setup gilt für alle Seiten dieses Boards. Beim Seitentausch wird das Board gespiegelt.')].filter(Boolean));
   };
   let m;
   render();
-  m = modal({ title: 'Board-Einstellungen', body, actions: [{ label: 'Fertig', primary: true }] });
+  m = modal({ title: 'Board-Einstellungen', wide: true, body, actions: [{ label: 'Fertig', primary: true }] });
 }
 
 /** Neues Board: Name, Feld, Mannschaft(en), optional direkt mit Aufstellung */
 export function openNewBoard(onDone) {
   const name = h('input', { class: 'input', placeholder: 'z. B. Spiel gegen …' });
   const ft = h('select', { class: 'input select' }, Object.entries(FIELDS).map(([k, f]) => h('option', { value: k, selected: (board()?.fieldType || 'indiaca') === k }, f.label)));
-  const sq = h('select', { class: 'input select' }, squadOptions(''));
-  const op = h('select', { class: 'input select' }, squadOptions(''));
-  const startBox = h('div', { class: 'form-row' });
+  const cfg = { left: { squadId: '', lineupId: '', laeufer: 2 }, right: { squadId: '', lineupId: '', laeufer: 2 } };
   let start = true;
+  const startBox = h('div', {});
   const renderStart = () => {
-    const s = squadById(sq.value);
-    if (!s || !s.aufstellungen.length) {
-      startBox.replaceChildren();
-      return;
-    }
-    const sw = h('button', { class: 'switch' + (start ? ' on' : ''), role: 'switch', 'aria-checked': String(start), onclick: () => { start = !start; renderStart(); } }, h('span'));
-    const lu = h('select', { class: 'input select', disabled: !start }, s.aufstellungen.map((a) => h('option', { value: a.id, selected: a.id === defaultLineup(s)?.id }, a.name + (a.standard ? ' (Standard)' : ''))));
-    startBox.replaceChildren(h('div', { class: 'set-row' }, h('b', {}, 'Mit Aufstellung starten'), sw), lu);
+    const any = ['left', 'right'].some((s) => cfg[s].lineupId);
+    const sw = h('button', { class: 'switch' + (start ? ' on' : ''), role: 'switch', 'aria-checked': String(start), 'aria-label': 'Mit Aufstellung starten', onclick: () => { start = !start; renderStart(); } }, h('span'));
+    startBox.replaceChildren(any ? h('div', { class: 'set-row' }, h('div', {}, h('b', {}, 'Mit Aufstellung starten'), h('div', { class: 'muted small' }, 'Gewählte Aufstellungen mit Läufer direkt aufs Feld setzen')), sw) : '');
   };
-  sq.onchange = renderStart;
+  const ed = setupEditor(cfg, () => renderStart());
+  renderStart();
   modal({
     title: 'Neues Board',
+    wide: true,
     body: h('div', { class: 'form' },
-      h('label', { class: 'form-row' }, h('span', {}, 'Name'), name),
-      h('label', { class: 'form-row' }, h('span', {}, 'Feld'), ft),
-      lib.squads.length
-        ? h('div', { class: 'form-2' },
-            h('label', { class: 'form-row' }, h('span', {}, 'Mannschaft (optional)'), sq),
-            h('label', { class: 'form-row' }, h('span', {}, 'Gegner (optional)'), op))
-        : h('p', { class: 'muted small' }, 'Tipp: Unter „Mannschaften“ kannst du Teams mit Aufstellungen anlegen und hier auswählen.'),
+      h('div', { class: 'form-2' },
+        h('label', { class: 'form-row' }, h('span', {}, 'Name'), name),
+        h('label', { class: 'form-row' }, h('span', {}, 'Feld'), ft)),
+      h('div', { class: 'form-row' }, h('span', {}, 'Spiel-Setup (optional)'), ed),
+      lib.squads.length ? null : h('p', { class: 'muted small' }, 'Tipp: Unter „Mannschaften“ legst du eigene Teams mit Aufstellungen an; Gegner gehen direkt hier über „＋ Neue Gegner-Mannschaft“.'),
       startBox),
     actions: [
       { label: 'Abbrechen' },
@@ -343,14 +307,11 @@ export function openNewBoard(onDone) {
           if (!n) { name.focus(); return false; }
           createBoard(n, ft.value);
           const b = board();
-          if (sq.value) b.squadId = sq.value;
-          if (op.value) b.oppSquadId = op.value;
-          const s = squadById(sq.value);
-          const luSel = startBox.querySelector('select');
-          if (s && start && luSel) {
-            const lu = lineupById(s, luSel.value);
-            if (lu) applyLineup(s, lu, 'own', 'replace', b.pages[0], b, lu.laeufer);
-          }
+          // Eigene Mannschaft wird intern zum Team 'own' (Statistik); steht sie rechts, liegt das Board andersherum
+          const isOwn = (s) => squadById(cfg[s].squadId)?.typ === 'eigen';
+          b.ownSide = !isOwn('left') && isOwn('right') ? 'right' : 'left';
+          writeSetup(b, cfg);
+          if (start) placeSetup(b, b.pages[0]);
           touch(b);
           emit('board');
           emit('page');

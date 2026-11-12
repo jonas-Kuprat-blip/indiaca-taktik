@@ -790,3 +790,4 @@ html.phone .rotbar.top { top: 6px; bottom: auto; }
 html.phone #stage-wrap.anim .rotbar:not(.top) { bottom: 60px; }
 .lu-rot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
 .lu-l { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.laeufer-seg .seg-btn { min-width: 52px; height: 44px; }

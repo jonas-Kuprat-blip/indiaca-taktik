@@ -7,6 +7,7 @@ import {
 } from '../library.js';
 import { modal, confirmDlg, promptText, colorPicker } from './dialogs.js';
 import { editPlayer } from './roster.js';
+import { laeuferSeg } from '../kader.js';
 
 const live = (m, render) => on('library', () => document.body.contains(m.box) && render());
 
@@ -157,7 +158,7 @@ export function openLineup(squadId, lineupId) {
     body.replaceChildren(
       h('div', { class: 'lu-top' }, name, h('label', { class: 'lu-std' }, std, 'Standard')),
       h('div', { class: 'pe' },
-        h('div', { class: 'pe-field' }, svg, rotRow, h('div', { class: 'muted small' }, 'Spieler auf einen Platz ziehen. Antippen eines belegten Platzes leert ihn. Kleine Zahl = Position.')),
+        h('div', { class: 'pe-field' }, svg, rotRow, laeuferSeg(a.laeufer || 2, (L) => updateLineup(squadId, lineupId, { laeufer: L })), h('div', { class: 'muted small' }, 'Spieler auf einen Platz ziehen. Antippen eines belegten Platzes leert ihn. Kleine Zahl = Position.')),
         h('div', { class: 'pe-names' }, ...rows, h('div', { class: 'muted small', style: { marginTop: '6px' } }, 'Spieler der Mannschaft'), chips)));
   };
   const bindChipDrag = (chip, playerId) => {

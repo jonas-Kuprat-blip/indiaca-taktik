@@ -121,6 +121,12 @@ export function applyLineup(sq, lu, team, mode = 'replace', pg = page(), b = boa
 }
 
 /** „Aufstellung einsetzen“ */
+/** Auswahl Läufer 1–5 (1. Zuspieler auf Position …) */
+export function laeuferSeg(cur, onPick) {
+  return h('div', { class: 'seg laeufer-seg', role: 'group', 'aria-label': 'Läufer' },
+    POS_NUMS.map((L) => h('button', { class: 'seg-btn' + (L === cur ? ' active' : ''), 'aria-label': `Läufer ${L}`, onclick: () => onPick(L) }, 'L' + L)));
+}
+
 export function openInsertLineup() {
   if (!lib.squads.length) {
     toast('Lege zuerst unter „Mannschaften“ eine Mannschaft mit Aufstellung an');
@@ -131,18 +137,22 @@ export function openInsertLineup() {
   const squads = own || opp ? [own, opp].filter(Boolean) : sortedSquads();
   let sqId = squads[0].id;
   let team = sqId === b.oppSquadId && !own ? 'opp' : 'own';
+  let luId = null, laeufer = null;
   const body = h('div', { class: 'form' });
   const render = () => {
     const sq = squadById(sqId);
     const lus = sq.aufstellungen;
+    if (!lineupById(sq, luId)) { luId = defaultLineup(sq)?.id || null; laeufer = null; }
+    if (laeufer == null) laeufer = lineupById(sq, luId)?.laeufer || 2;
     const sqSel = h('select', { class: 'input select' }, squads.map((s) => h('option', { value: s.id, selected: s.id === sqId }, s.name + (s.id === b.squadId ? ' (Board)' : s.id === b.oppSquadId ? ' (Gegner)' : ''))));
     sqSel.onchange = () => {
       sqId = sqSel.value;
+      luId = null;
       team = sqId === b.oppSquadId ? 'opp' : sqId === b.squadId ? 'own' : team;
       render();
     };
     const luSel = h('select', { class: 'input select', disabled: !lus.length }, lus.length
-      ? lus.map((a) => h('option', { value: a.id, selected: a.id === defaultLineup(sq)?.id }, a.name + (a.standard ? ' (Standard)' : '')))
+      ? lus.map((a) => h('option', { value: a.id, selected: a.id === luId }, a.name + (a.standard ? ' (Standard)' : '')))
       : h('option', {}, 'Keine Aufstellung vorhanden'));
     const seg = h('div', { class: 'seg' },
       h('button', { class: 'seg-btn' + (team === 'own' ? ' active' : ''), onclick: () => { team = 'own'; render(); } }, 'Eigenes Team'),
@@ -150,9 +160,9 @@ export function openInsertLineup() {
     body.replaceChildren(
       h('label', { class: 'form-row' }, h('span', {}, 'Mannschaft'), sqSel),
       h('label', { class: 'form-row' }, h('span', {}, 'Aufstellung'), luSel),
+      h('div', { class: 'form-row' }, h('span', {}, 'Läufer (1. Zuspieler auf Position …)'), laeuferSeg(laeufer, (L) => { laeufer = L; render(); })),
       h('div', { class: 'form-row' }, h('span', {}, 'Seite'), seg));
-    body.dataset.lu = luSel.value;
-    luSel.onchange = () => (body.dataset.lu = luSel.value);
+    luSel.onchange = () => { luId = luSel.value; laeufer = null; render(); };
   };
   render();
   modal({
@@ -164,7 +174,7 @@ export function openInsertLineup() {
         label: 'Einsetzen', primary: true,
         onClick: async () => {
           const sq = squadById(sqId);
-          const lu = lineupById(sq, body.dataset.lu);
+          const lu = lineupById(sq, luId);
           if (!lu) { toast('Diese Mannschaft hat noch keine Aufstellung'); return false; }
           const hasPlayers = page().elements.some((e) => e.type === 'player' && e.team === team);
           let mode = 'replace';
@@ -175,8 +185,8 @@ export function openInsertLineup() {
             ]);
             if (!mode) return false;
           }
-          applyLineup(sq, lu, team, mode, page(), board(), lu.laeufer);
-          toast(`${lu.name} eingesetzt`);
+          applyLineup(sq, lu, team, mode, page(), board(), laeufer);
+          toast(`${lu.name} eingesetzt (Läufer ${laeufer})`);
         },
       },
     ],
